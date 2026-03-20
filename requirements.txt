@@ -1,0 +1,5 @@
+gigachat==0.1.43
+langchain-community==0.3.31
+langchain-gigachat==0.3.12
+langgraph==1.0.1
+pydantic==2.12.5
