@@ -1,3 +1,13 @@
+"""
+Точка входа: CLI-режим для прототипа.
+В будущем здесь будет FastAPI-сервер и интеграция с AI-агентом-маршрутизатором.
+
+Использование:
+    python main.py                         — демо: исковое заявление
+    python main.py --pretrial              — демо: досудебная претензия
+    python main.py input.json              — из JSON-файла
+    python main.py --text "описание..."    — из свободного текста
+"""
 from __future__ import annotations
 
 import json
@@ -9,21 +19,21 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+# ═══════════════════════════════════════════════════════════════
+#  Публичные функции запуска
+# ═══════════════════════════════════════════════════════════════
+
 def run_with_structured_input(data: dict) -> str:
     """Запуск с готовым словарём данных."""
     graph = create_graph()
-    initial_state = {
-        "input_data": data,
-        "x_headers": {}
-    }
-    result = graph.invoke({"input_data": data})
+    result = graph.invoke({"input_data": data, "doc_type": data.get("doc_type", "lawsuit")})
     return result.get("final_document", result.get("generated_document", ""))
 
 
-def run_with_raw_text(text: str) -> str:
+def run_with_raw_text(text: str, doc_type: str = "lawsuit") -> str:
     """Запуск со свободным текстом."""
     graph = create_graph()
-    result = graph.invoke({"raw_input": text})
+    result = graph.invoke({"raw_input": text, "doc_type": doc_type})
     return result.get("final_document", result.get("generated_document", ""))
 
 
@@ -32,37 +42,40 @@ def run_with_raw_text(text: str) -> str:
 # ═══════════════════════════════════════════════════════════════
 
 def main() -> None:
-    """
-    Использование:
-        python main.py                        — демо с тестовыми данными
-        python main.py input.json             — из JSON-файла
-        python main.py --text "описание..."   — из свободного текста
-    """
-    if len(sys.argv) > 1 and sys.argv[1] == "--text":
+    if len(sys.argv) > 1 and sys.argv[1] == "--pretrial":
+        logger.info("Running pretrial claim demo")
+        doc = run_with_structured_input(_demo_pretrial_data())
+    elif len(sys.argv) > 1 and sys.argv[1] == "--text":
         text = " ".join(sys.argv[2:])
         logger.info("Running with raw text input")
         doc = run_with_raw_text(text)
-    elif len(sys.argv) > 1:
+    elif len(sys.argv) > 1 and sys.argv[1].endswith(".json"):
         filepath = sys.argv[1]
         logger.info("Running with JSON file: %s", filepath)
         with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
         doc = run_with_structured_input(data)
     else:
-        logger.info("Running with demo data")
-        doc = run_with_structured_input(_demo_data())
+        logger.info("Running lawsuit demo")
+        doc = run_with_structured_input(_demo_lawsuit_data())
 
     print("\n" + "=" * 80)
     print(doc)
     print("=" * 80)
 
 
-def _demo_data() -> dict:
-    """Тестовые данные для отладки."""
+# ═══════════════════════════════════════════════════════════════
+#  Демо-данные: исковое заявление
+# ═══════════════════════════════════════════════════════════════
+
+def _demo_lawsuit_data() -> dict:
+    """Тестовые данные для искового заявления (договор займа)."""
     return {
-        "x_headers": {},
+        "doc_type": "lawsuit",
         "plaintiff_info": (
-            "Иванов Иван Иванович, 01.01.1976 г.р., "
+            "Иванов Иван Иванович, 01.01.1985 г.р., "
+            "паспорт серия 4510 номер 123456, выдан УФМС России по г. Москве 15.03.2005, "
+            "ИНН 772501234567, "
             "адрес: 123456, г. Москва, ул. Ленина, д. 10, кв. 5, "
             "тел.: +7 (999) 123-45-67, email: ivanov@example.com"
         ),
@@ -84,7 +97,7 @@ def _demo_data() -> dict:
             "платёжным поручением № 123 от 15.01.2024. "
             "Согласно п. 5.2 договора, в случае просрочки возврата заёмщик "
             "уплачивает неустойку в размере 0,1% от суммы долга за каждый день просрочки. "
-            "По состоянию на текущую дату ответчик сумму займа не вернул, "
+            "По состоянию на 15.01.2025 ответчик сумму займа не вернул, "
             "на претензию от 20.07.2024 не ответил."
         ),
         "documents": (
@@ -95,19 +108,84 @@ def _demo_data() -> dict:
         ),
         "claims": (
             "Взыскать с ответчика сумму основного долга по договору займа, "
-            "неустойку за просрочку возврата, судебные расходы по уплате госпошлины."
+            "проценты за пользование займом, "
+            "неустойку за просрочку возврата, "
+            "неустойку по день фактического исполнения, "
+            "судебные расходы по уплате госпошлины."
         ),
         "pretrial_settlement": (
             "20.07.2024 ответчику направлена претензия с требованием возврата "
             "суммы займа в течение 10 дней. Претензия получена ответчиком "
-            "25.07.2024 (уведомление о вручении). Ответа на претензию не последовало."
+            "25.07.2024 (уведомление о вручении). Ответа не последовало."
         ),
+        # ── Суммы ──────────────────────────────
         "principal_amount": 500_000,
-        "penalty_rate": 0.001,  # 0.1% в день
+        # ── Проценты за пользование (ст. 809 ГК) ──
+        "loan_interest_rate": 0.10,       # 10% годовых
+        "loan_start_date": "15.01.2024",  # дата выдачи
+        "loan_end_date": "15.01.2025",    # дата расчёта
+        # ── Неустойка ──────────────────────────
+        "penalty_rate": 0.001,            # 0.1% в день
         "penalty_start_date": "16.07.2024",
         "penalty_end_date": "15.01.2025",
+        # ── Флаги ─────────────────────────────
+        "request_ongoing_penalty": True,
+        "request_ongoing_interest": True,
+        # ── Прочее ────────────────────────────
         "moral_damage": 0,
         "court_expenses": 0,
+    }
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Демо-данные: досудебная претензия
+# ═══════════════════════════════════════════════════════════════
+
+def _demo_pretrial_data() -> dict:
+    """Тестовые данные для досудебной претензии (договор займа)."""
+    return {
+        "doc_type": "pretrial_claim",
+        "sender_info": (
+            "Иванов Иван Иванович, ИНН 772501234567, "
+            "адрес: 123456, г. Москва, ул. Ленина, д. 10, кв. 5, "
+            "тел.: +7 (999) 123-45-67, email: ivanov@example.com"
+        ),
+        "recipient_info": (
+            'ООО «Ромашка», ИНН 7701234567, ОГРН 1027700123456, '
+            "адрес: 123456, г. Москва, ул. Пушкина, д. 20, офис 100, "
+            'генеральный директор Петров П.П.'
+        ),
+        "claim_type": "возврат долга по договору займа",
+        "basis": "Договор займа № 15/01-2024 от 15.01.2024",
+        "facts": (
+            '15.01.2024 между Ивановым И.И. и ООО «Ромашка» заключён договор '
+            "займа № 15/01-2024 на сумму 500 000 руб. под 10% годовых "
+            "сроком до 15.07.2024. Факт передачи подтверждён платёжным "
+            "поручением № 123 от 15.01.2024. По договору (п. 5.2) "
+            "неустойка за просрочку — 0,1% в день. "
+            "По состоянию на 15.01.2025 долг не возвращён."
+        ),
+        "supporting_documents": (
+            "1. Договор займа № 15/01-2024 от 15.01.2024\n"
+            "2. Платёжное поручение № 123 от 15.01.2024"
+        ),
+        "sender_demands": (
+            "Вернуть сумму займа 500 000 руб., проценты за пользование, "
+            "неустойку за просрочку."
+        ),
+        "response_deadline": "10 календарных дней с момента получения настоящей претензии",
+        # ── Суммы ──────────────────────────────
+        "principal_amount": 500_000,
+        # ── Проценты за пользование ────────────
+        "loan_interest_rate": 0.10,
+        "loan_start_date": "15.01.2024",
+        "loan_end_date": "15.01.2025",
+        # ── Неустойка ──────────────────────────
+        "penalty_rate": 0.001,
+        "penalty_start_date": "16.07.2024",
+        "penalty_end_date": "15.01.2025",
+        # ── Прочее ────────────────────────────
+        "moral_damage": 0,
     }
 
 

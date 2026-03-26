@@ -1,7 +1,12 @@
 """
 Модуль правового исследования.
+
 Прототип: генерация применимых норм через LLM.
 Будущее: RAG по векторной БД с кодексами и законами.
+
+Поддерживает два типа документов:
+  • lawsuit        — исковое заявление
+  • pretrial_claim — досудебная претензия
 """
 from __future__ import annotations
 
@@ -17,6 +22,8 @@ from app.utils.logger import get_logger
 from app.utils.prompts import (
     RESEARCH_HUMAN,
     RESEARCH_SYSTEM,
+    PRETRIAL_RESEARCH_HUMAN,
+    PRETRIAL_RESEARCH_SYSTEM,
     render_template,
 )
 
@@ -28,10 +35,28 @@ _CASE_TYPE_LABELS = {
 }
 
 
+# ═══════════════════════════════════════════════════════════════
+#  Публичный узел графа
+# ═══════════════════════════════════════════════════════════════
+
 def research_node(state: AgentState) -> dict[str, Any]:
     """Узел графа: определение применимых норм права."""
-    logger.info("Research node started")
+    logger.info("▶ Research node started")
 
+    doc_type = state.get("doc_type", "lawsuit")
+
+    if doc_type == "pretrial_claim":
+        return _research_pretrial(state)
+    else:
+        return _research_lawsuit(state)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Исследование для исков
+# ═══════════════════════════════════════════════════════════════
+
+def _research_lawsuit(state: AgentState) -> dict[str, Any]:
+    """Подбор норм для искового заявления."""
     case_type = state.get("case_type", "civil")
 
     prompt = render_template(
@@ -51,7 +76,7 @@ def research_node(state: AgentState) -> dict[str, Any]:
             HumanMessage(content=prompt),
         ])
         data = _parse_research(content)
-        logger.info("  Research completed, laws length: %d chars", len(data.get("applicable_laws", "")))
+        logger.info("  Research [lawsuit] completed, laws length: %d chars", len(data.get("applicable_laws", "")))
         return data
 
     except Exception as e:
@@ -62,7 +87,46 @@ def research_node(state: AgentState) -> dict[str, Any]:
         }
 
 
+# ═══════════════════════════════════════════════════════════════
+#  Исследование для претензий
+# ═══════════════════════════════════════════════════════════════
+
+def _research_pretrial(state: AgentState) -> dict[str, Any]:
+    """Подбор норм для досудебной претензии."""
+    prompt = render_template(
+        PRETRIAL_RESEARCH_HUMAN,
+        {
+            "case_category": state.get("case_category", "other"),
+            "is_property_dispute": state.get("is_property_dispute", False),
+            "facts": state.get("facts", ""),
+            "basis": state.get("basis", ""),
+            "sender_demands": state.get("sender_demands", ""),
+        },
+    )
+
+    try:
+        content = invoke_llm([
+            SystemMessage(content=PRETRIAL_RESEARCH_SYSTEM),
+            HumanMessage(content=prompt),
+        ])
+        data = _parse_research(content)
+        logger.info("  Research [pretrial] completed, laws length: %d chars", len(data.get("applicable_laws", "")))
+        return data
+
+    except Exception as e:
+        logger.error("Pretrial research failed: %s", e)
+        return {
+            "applicable_laws": "[Не удалось определить применимые нормы — требуется ручная проверка]",
+            "legal_positions": "",
+        }
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Парсинг ответа LLM
+# ═══════════════════════════════════════════════════════════════
+
 def _parse_research(text: str) -> dict[str, Any]:
+    """Извлекает JSON из ответа LLM."""
     m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
     if m:
         raw = m.group(1)

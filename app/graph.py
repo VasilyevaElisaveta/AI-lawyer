@@ -1,5 +1,8 @@
 """
 Оркестратор: сборка LangGraph-графа из модулей.
+
+Единый граф для обоих типов документов (lawsuit / pretrial_claim).
+Тип документа определяется полем doc_type в state и роутится внутри узлов.
 """
 from __future__ import annotations
 
@@ -29,7 +32,7 @@ logger = get_logger(__name__)
 
 def finalize_node(state: AgentState) -> dict[str, Any]:
     """Копирует generated_document → final_document."""
-    logger.info("Finalize node")
+    logger.info("▶ Finalize node")
     return {"final_document": state.get("generated_document", "")}
 
 
@@ -88,6 +91,11 @@ def create_graph() -> Any:
     """
     Создаёт и компилирует LangGraph StateGraph.
     Возвращает скомпилированный граф, готовый к .invoke() / .stream().
+
+    Единый граф для обоих типов документов.
+    Тип определяется через state["doc_type"]:
+      • "lawsuit"        — исковое заявление (по умолчанию)
+      • "pretrial_claim" — досудебная претензия
     """
     builder = StateGraph(AgentState)
 
