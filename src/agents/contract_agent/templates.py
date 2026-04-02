@@ -1,0 +1,38 @@
+DOCUMENT_TEMPLATES = {
+    "lawsuit": (
+        "Исковое заявление\n"
+        "================\n"
+        "Истец:\n{plaintiff_info}\n\n"
+        "Ответчик:\n{defendant_info}\n\n"
+        "Фактические обстоятельства:\n{facts}\n\n"
+        "Требования:\n{claims}\n\n"
+        "Правовое обоснование:\n{applicable_laws}\n\n"
+        "Суммовые показатели:\n"
+        "- Основная сумма: {principal_amount}\n"
+        "- Проценты: {interest_amount}\n"
+        "- Пеня: {penalty_amount}\n"
+        "- Штрафы и неустойки: {loan_interest_amount}\n"
+        "- Компенсация морального вреда: {moral_damage}\n"
+        "- Судебные расходы: {court_expenses}\n"
+        "- Государственная пошлина: {state_duty}\n"
+        "- Общая сумма: {total_claim}\n"
+        "- Прошу взыскать текущую пеню: {request_ongoing_penalty}\n"
+    ),
+    "pretrial_claim": (
+        "Досудебная претензия\n"
+        "=======================\n"
+        "Отправитель:\n{sender_info}\n\n"
+        "Получатель:\n{recipient_info}\n\n"
+        "Фактические обстоятельства:\n{facts}\n\n"
+        "Требования:\n{sender_demands}\n\n"
+        "Правовое обоснование:\n{applicable_laws}\n\n"
+        "Сумма требований:\n"
+        "- Основная сумма: {principal_amount}\n"
+        "- Проценты: {interest_amount}\n"
+        "- Пеня: {penalty_amount}\n"
+        "- Штрафы: {loan_interest_amount}\n"
+        "- Моральный вред: {moral_damage}\n"
+        "- Общая сумма: {total_amount}\n\n"
+        "Срок ответа на претензию: {response_deadline}\n"
+    ),
+}
