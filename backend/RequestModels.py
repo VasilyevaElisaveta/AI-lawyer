@@ -1,14 +1,33 @@
 from pydantic import BaseModel, Field, model_validator
 from string import punctuation, ascii_uppercase, digits
+from re import fullmatch
 
 
 class RegistrationRequestModel(BaseModel):
 
     model_config = {"extra": "forbid"}
 
+    name: str
+    surname: str
+    patronymic: str | None
     username: str
+    email: str
     password: str = Field(min_length=8)
-    data_processing_policy_accepted: bool
+    user_agreement_accepted: bool
+    personal_data_processing_accepted: bool
+
+    @model_validator(mode="after")
+    def validate_agreements(self):
+        if not self.user_agreement_accepted or not self.personal_data_processing_accepted:
+            raise ValueError("The user must accept the user agreement and the personal data processing policy before registration.")
+        return self
+    
+    @model_validator(mode="after")
+    def validate_email(self):
+        email_re = r"[a-zA-Z0-9]+[a-zA-Z0-9.-_]+@[a-z]+\.[a-z]+"
+        if fullmatch(email_re, self.email) is None:
+            raise ValueError(f"{self.email} is not an email.")
+        return self
 
     @model_validator(mode="after")
     def validate_password(self):
