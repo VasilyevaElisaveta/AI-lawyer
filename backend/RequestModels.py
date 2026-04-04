@@ -49,3 +49,28 @@ class RegistrationRequestModel(BaseModel):
             raise ValueError("Password must contain digits, special symbols, upper letters and be at least 8 characters long")
         
         return self
+
+
+class LoginRequestModel(BaseModel):
+
+    model_config = {"extra": "forbid"}
+
+    username: str
+    password: str
+
+
+class LoginResponseModel(BaseModel):
+
+    access_token: str
+    refresh_token: str
+    token_type: str
+
+
+class UserResponseModel(BaseModel):
+
+    name: str
+    surname: str
+    patronymic: str | None
+    username: str
+    email: str
+    password: str

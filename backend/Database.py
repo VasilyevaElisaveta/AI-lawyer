@@ -1,7 +1,7 @@
 from os import getenv
 from tempfile import TemporaryDirectory
 
-from sqlalchemy import and_, create_engine, func, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -79,7 +79,7 @@ class Database:
     
     @staticmethod
     def __get_user_query(value: str, by_username: bool):
-        query = select(User.id).select_from(User)
+        query = select(User.id, User.name, User.surname, User.patronymic, User.username, User.email, User.password).select_from(User)
         if by_username:
             query = query.filter_by(username=value)
         else:
@@ -89,7 +89,7 @@ class Database:
     async def get_user(self, value: str, by_username: bool=True):
         query = Database.__get_user_query(value, by_username)
         result = await self.__exec_query(query)
-        return result.one_or_none()
+        return result.mappings().one_or_none()
     
     async def create_user(self, username: str, email: str, password: str, name: str, surname: str, patronymic: str | None):
         new_user = User(username=username, email=email, password=password, name=name, surname=surname, patronymic=patronymic)
