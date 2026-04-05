@@ -25,7 +25,6 @@ async def validation_node(state: AgentState) -> dict[str, Any]:
             {
                 "validation_errors": missing_fields,
                 "is_valid": False,
-                "error": prompt,
                 "validation_attempts": validation_attempts,
             }
         )

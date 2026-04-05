@@ -125,4 +125,3 @@ class AgentState(TypedDict, total=False):
 
     # ── Финальный результат ───────────────────────────────────
     final_document: str
-    error: str
