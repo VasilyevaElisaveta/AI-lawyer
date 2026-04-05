@@ -10,8 +10,8 @@ from .state import AgentState
 
 
 def generate_document(state: AgentState) -> str:
-    doc_type = state.get("doc_type", "lawsuit")
-    template = DOCUMENT_TEMPLATES.get(doc_type, DOCUMENT_TEMPLATES["lawsuit"])
+    doc_type = state.get("doc_type", "contract")
+    template = DOCUMENT_TEMPLATES.get(doc_type, DOCUMENT_TEMPLATES["contract"])
     rendered = render_template(
         template,
         {
