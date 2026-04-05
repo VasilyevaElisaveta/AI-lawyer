@@ -1,23 +1,12 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
-
-from .fields import STOP_PHRASES
+from .graph import ContractAgent as GraphAgent
 from .llm_client import GigaChatClient
-from .qa import qa_node
 from .state import AgentState
-from .document import generate_document
-from .extraction import (
-    build_missing_fields_prompt,
-    find_missing_required_fields,
-    merge_fields,
-    safe_parse_json,
-)
-from .prompts import CLASSIFICATION_PROMPT, CLASSIFICATION_SYSTEM
+
 
 @dataclass
 class AgentResponse:
@@ -31,80 +20,33 @@ class AgentResponse:
 
 class ContractAgent:
     def __init__(self, llm: GigaChatClient | None = None) -> None:
-        self.llm = llm or GigaChatClient()
+        self.graph_agent = GraphAgent(llm)
 
     async def process_user_message(self, user_message: str, state: AgentState | None = None) -> AgentResponse:
-        state = state.copy() if state is not None else AgentState()
-        user_message = user_message.strip()
+        if state is None:
+            state = AgentState()
 
-        if self._is_exit_requested(user_message):
+        # Запускаем граф
+        result = await self.graph_agent.process_user_message(user_message, state)
+
+        # Формируем ответ
+        if result.get("error"):
+            reply = result["error"]
+            missing_fields = result.get("validation_errors", [])
             return AgentResponse(
-                reply="Хорошо, прекращаем обсуждение текущего запроса.",
-                state=state,
-                exit_requested=True,
-            )
-
-        state.set("last_user_message", user_message)
-
-        await self._classify_and_extract(user_message, state)
-
-        missing_fields = find_missing_required_fields(state)
-        if missing_fields:
-            state.set("awaiting_fields", missing_fields)
-            return AgentResponse(
-                reply=build_missing_fields_prompt(missing_fields),
-                state=state,
+                reply=reply,
+                state=result,
                 missing_fields=missing_fields,
             )
-
-        state.set("awaiting_fields", [])
-        document = generate_document(state)
-        state.set("generated_document", document)
-
-        qa_result = await qa_node(state, self.llm)
-        if qa_result["qa_passed"]:
+        elif result.get("final_document"):
+            reply = result["final_document"]
             return AgentResponse(
-                reply=document,
-                state=state,
+                reply=reply,
+                state=result,
                 qa_passed=True,
-                generated_document=document,
+                generated_document=reply,
             )
-
-        feedback = qa_result.get("qa_feedback", "Документ сгенерирован, но рецензент нашёл замечания.")
-        return AgentResponse(
-            reply=(
-                "Документ сгенерирован, но он не проходит рецензию. \n"
-                "Пожалуйста, уточните недостающие данные или измените формулировки.\n\n"
-                f"{feedback}"
-            ),
-            state=state,
-            qa_passed=False,
-            generated_document=document,
-        )
-
-    def _is_exit_requested(self, text: str) -> bool:
-        normalized = text.lower()
-        return any(phrase in normalized for phrase in STOP_PHRASES)
-
-    async def _classify_and_extract(self, user_message: str, state: AgentState) -> None:
-        existing_state = json.dumps(state.to_dict(), ensure_ascii=False, indent=2)
-        prompt = CLASSIFICATION_PROMPT.format(
-            existing_state=existing_state,
-            user_message=user_message,
-        )
-
-        try:
-            content = await self.llm.invoke([
-                SystemMessage(content=CLASSIFICATION_SYSTEM),
-                HumanMessage(content=prompt),
-            ])
-            parsed = safe_parse_json(content)
-        except Exception:
-            parsed = {}
-
-        doc_type = parsed.get("doc_type") or state.get("doc_type") or "lawsuit"
-        state.set("doc_type", doc_type)
-
-        fields = parsed.get("fields", {}) or {}
-        merge_fields(state, fields)
-
+        else:
+            # Другие случаи
+            reply = "Обработка завершена, но результат не определён."
+            return AgentResponse(reply=reply, state=result)
