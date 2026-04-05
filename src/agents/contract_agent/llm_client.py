@@ -6,21 +6,17 @@ from typing import Any
 
 from langchain_gigachat import GigaChat
 from langchain_core.messages import BaseMessage
+from dotenv import load_dotenv
 
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
+load_dotenv()
 
 SBER_AUTH = os.getenv("SBER_AUTH")
-
 
 class GigaChatClient:
     def __init__(
         self,
         model: str = "GigaChat",
-        temperature: float = 1.0,
+        temperature: float = 0.0,
     ) -> None:
         credentials = SBER_AUTH or os.getenv("SBER_AUTH")
         if not credentials:
