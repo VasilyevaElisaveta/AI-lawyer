@@ -5,7 +5,7 @@ from typing import Any, Literal
 
 from langgraph.graph import END, START, StateGraph
 
-from .extraction import build_missing_fields_prompt, find_missing_required_fields, intake_node
+from .extraction import find_missing_required_fields, intake_node
 from .llm_client import GigaChatClient
 from .qa import qa_node
 from .state import AgentState
@@ -19,8 +19,6 @@ async def validation_node(state: AgentState) -> dict[str, Any]:
 
     missing_fields = find_missing_required_fields(state)
     if missing_fields:
-        # Генерируем стандартный ответ с требованием заполнить поля
-        prompt = build_missing_fields_prompt(missing_fields)
         state.update(
             {
                 "validation_errors": missing_fields,

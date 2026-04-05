@@ -54,18 +54,6 @@ FIELD_LABELS = {
     "contract_amount": "Сумма договора",
 }
 
-STOP_PHRASES = [
-    "не хочу обсуждать",
-    "больше не хочу",
-    "хватит",
-    "стоп",
-    "перестань",
-    "закончить",
-    "закончи",
-    "выход",
-    "закончим",
-]
-
 BOOLEAN_FIELDS = []
 NUMERIC_FIELDS = [
     "contract_amount",

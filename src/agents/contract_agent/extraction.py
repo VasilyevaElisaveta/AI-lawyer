@@ -12,8 +12,6 @@ from .fields import (
     FIELD_LABELS,
     NUMERIC_FIELDS,
     REQUIRED_FIELDS_BY_TYPE,
-    _VALID_CASE_TYPES,
-    _VALID_CATEGORIES,
 )
 from .llm_client import GigaChatClient
 from .prompts import (
@@ -91,18 +89,6 @@ def find_missing_required_fields(state: AgentState) -> list[str]:
         if value is None or (isinstance(value, str) and not value.strip()):
             missing.append(key)
     return missing
-
-
-def build_missing_fields_prompt(missing_fields: list[str]) -> str:
-    lines = [
-        "Для продолжения подготовки договора нужны дополнительные данные:",
-    ]
-    for key in missing_fields:
-        lines.append(f"- {FIELD_LABELS.get(key, key)}")
-    lines.append(
-        "Пожалуйста, пришлите недостающие сведения. Если хотите, можете отвечать простым текстом без формальностей."
-    )
-    return "\n".join(lines)
 
 
 # ═══════════════════════════════════════════════════════════════
