@@ -104,7 +104,7 @@ class AgentState(TypedDict, total=False):
     validation_errors: list[str]
     validation_warnings: list[str]  # мягкие предупреждения (рекомендации)
     is_valid: bool
-    validation_attempts: int
+    response_to_user: str | None    # сообщение пользователю при недостающих данных
 
     # ── Правовое исследование ─────────────────────────────────
     applicable_laws: str

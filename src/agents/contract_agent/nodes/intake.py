@@ -10,6 +10,8 @@ from ..prompts import (
     CLASSIFICATION_SYSTEM,
     CONTRACT_INTAKE_HUMAN,
     CONTRACT_INTAKE_SYSTEM,
+    FIELD_EXTRACTION_PROMPT,
+    FIELD_EXTRACTION_SYSTEM,
 )
 from ..fields import (
     _CONTRACT_FIELDS,
@@ -54,32 +56,41 @@ async def _classify_request(text: str, state: AgentState, llm: GigaChatClient) -
 
 async def _extract_from_text(text: str, state: AgentState, llm: GigaChatClient) -> dict[str, Any]:
     """Извлечение структурированных данных из свободного текста через LLM."""
-    # Если это повторная попытка — добавляем контекст ошибок
     validation_errors = state.get("validation_errors", [])
-    additional = ""
+    
     if validation_errors:
-        additional = (
-            "\n\nПри предыдущей проверке обнаружены недостающие данные:\n"
-            + "\n".join(f"- {e}" for e in validation_errors)
-            + "\n\nПостарайся найти или вывести эту информацию из текста."
+        # Дозаполнение недостающих полей
+        existing_state = json.dumps({k: v for k, v in state.items() if k in _CONTRACT_FIELDS.values()}, ensure_ascii=False)
+        prompt = FIELD_EXTRACTION_PROMPT.format(
+            existing_state=existing_state,
+            user_message=text,
         )
-
-    prompt_text = render_template(
-        CONTRACT_INTAKE_HUMAN,
-        {"user_input": text, "additional_context": additional},
-    )
-
-    try:
-        content = await llm.ainvoke([
-            SystemMessage(content=CONTRACT_INTAKE_SYSTEM),
-            HumanMessage(content=prompt_text),
-        ])
-        data = safe_parse_json(content)
-        return _map_structured(data, _CONTRACT_FIELDS)
-
-    except Exception as e:
-        # Фолбэк: кладём весь текст в contract_subject
-        return {"contract_subject": text}
+        try:
+            content = await llm.ainvoke([
+                SystemMessage(content=FIELD_EXTRACTION_SYSTEM),
+                HumanMessage(content=prompt),
+            ])
+            parsed = safe_parse_json(content)
+            data = parsed.get("fields", {})
+            return _map_structured(data, _CONTRACT_FIELDS)
+        except Exception:
+            return {}
+    else:
+        # Начальное извлечение
+        prompt_text = render_template(
+            CONTRACT_INTAKE_HUMAN,
+            {"user_input": text, "additional_context": ""},
+        )
+        try:
+            content = await llm.ainvoke([
+                SystemMessage(content=CONTRACT_INTAKE_SYSTEM),
+                HumanMessage(content=prompt_text),
+            ])
+            data = safe_parse_json(content)
+            return _map_structured(data, _CONTRACT_FIELDS)
+        except Exception as e:
+            # Фолбэк: кладём весь текст в contract_subject
+            return {"contract_subject": text}
 
 
 async def intake_node(state: AgentState, llm: GigaChatClient) -> dict[str, Any]:

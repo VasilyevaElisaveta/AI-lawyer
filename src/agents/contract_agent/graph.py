@@ -32,12 +32,10 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     graph.add_edge("intake", "validation")
 
     # Conditional от validation
-    def validation_router(state: AgentState) -> Literal["intake", "generation", "final"]:
+    def validation_router(state: AgentState) -> Literal["generation", "final"]:
         if state.get("is_valid", False):
             return "generation"
-        if state.get("validation_attempts", 0) >= 3:
-            return "final"
-        return "intake"  # обратно к intake для дозаполнения
+        return "final"
 
     graph.add_conditional_edges("validation", validation_router)
 
@@ -69,4 +67,14 @@ class ContractAgent:
 
         # Запускаем граф
         result = await self.graph.ainvoke(state)
+
+        # Универсальный ответ для внешнего маршрутизатора
+        if result.get("response_to_user"):
+            result["reply"] = result["response_to_user"]
+        else:
+            result["reply"] = result.get("final_document", "")
+
+        # Флаг, который показывает, что агент сам обработал запрос
+        result["handled_by_agent"] = True
+        result["document_created"] = bool(result.get("generated_document"))
         return result

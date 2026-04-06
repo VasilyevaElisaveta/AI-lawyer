@@ -1,14 +1,11 @@
-from __future__ import annotations
-
 import json
 import re
-from typing import Any
+from typing import Any, Dict
 
-from .contract_agent.state import AgentState
 from .contract_agent.fields import REQUIRED_FIELDS_BY_TYPE
 
 
-def render_template(template: str, variables: dict[str, Any]) -> str:
+def render_template(template: str, variables: Dict[str, Any]) -> str:
     class _SafeDict(dict):
         def __missing__(self, key: str) -> str:
             return ""
@@ -40,7 +37,7 @@ def build_qa_context(state: dict[str, Any]) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
-def find_missing_required_fields(state: AgentState, field_name: str) -> list[str]:
+def find_missing_required_fields(state: Dict[str, Any], field_name: str) -> list[str]:
     required = REQUIRED_FIELDS_BY_TYPE.get(field_name, [])
     missing: list[str] = []
     for key in required:

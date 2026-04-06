@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 # Валидные типы дел
 _VALID_CASE_TYPES: tuple[str, ...] = ("civil", "arbitration")
 
