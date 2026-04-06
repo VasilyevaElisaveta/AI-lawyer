@@ -1,8 +1,4 @@
-from __future__ import annotations
-
-import asyncio
 import os
-from typing import Any
 
 from langchain_gigachat import GigaChat
 from langchain_core.messages import BaseMessage
@@ -33,14 +29,14 @@ class GigaChatClient:
             timeout=120,
         )
 
-    async def invoke(self, messages: list[BaseMessage]) -> str:
-        response = await asyncio.to_thread(self.client.invoke, messages)
+    async def ainvoke(self, messages: list[BaseMessage]) -> str:
+        response = await self.client.ainvoke(messages)
         return getattr(response, "content", str(response))
 
     async def complete(self, system: str, prompt: str) -> str:
-        return await self.invoke(
+        return await self.ainvoke(
             [
-                BaseMessage.parse_obj({"type": "system", "text": system}),
-                BaseMessage.parse_obj({"type": "human", "text": prompt}),
+                BaseMessage.model_validate({"type": "system", "text": system}),
+                BaseMessage.model_validate({"type": "human", "text": prompt}),
             ]
         )

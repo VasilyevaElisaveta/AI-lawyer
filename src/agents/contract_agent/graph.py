@@ -5,49 +5,15 @@ from typing import Any, Literal
 
 from langgraph.graph import END, START, StateGraph
 
-from .extraction import find_missing_required_fields, intake_node
+from .nodes import (
+    intake_node, 
+    validation_node, 
+    generation_node, 
+    qa_node,
+    final_node
+)
 from .llm_client import GigaChatClient
-from .qa import qa_node
 from .state import AgentState
-from .document import generate_document
-
-
-async def validation_node(state: AgentState) -> dict[str, Any]:
-    """Нода валидации наличия необходимых полей."""
-    validation_attempts = state.get("validation_attempts", 0) + 1
-    state["validation_attempts"] = validation_attempts
-
-    missing_fields = find_missing_required_fields(state)
-    if missing_fields:
-        state.update(
-            {
-                "validation_errors": missing_fields,
-                "is_valid": False,
-                "validation_attempts": validation_attempts,
-            }
-        )
-        return dict(state)
-    state.update(
-        {
-            "validation_errors": [],
-            "is_valid": True,
-            "validation_attempts": validation_attempts,
-        }
-    )
-    return dict(state)
-
-
-async def generation_node(state: AgentState) -> dict[str, Any]:
-    """Нода для генерации текста документа."""
-    document = generate_document(state)
-    state["generated_document"] = document
-    return dict(state)
-
-
-async def final_node(state: AgentState) -> dict[str, Any]:
-    """Финальная нода: возврат документа."""
-    state["final_document"] = state.get("generated_document", "")
-    return dict(state)
 
 
 def create_graph(llm: GigaChatClient) -> StateGraph:

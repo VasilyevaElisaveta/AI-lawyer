@@ -1,15 +1,17 @@
-from __future__ import annotations
-
-import json
 import re
-from typing import Any
+import json
+from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from .llm_client import GigaChatClient
-from .state import AgentState
-from .prompts import CONTRACT_QA_HUMAN, QA_SYSTEM
-from .utils import build_qa_context, render_template
+from ..llm_client import GigaChatClient
+from ..state import AgentState
+from ..prompts import (
+    CONTRACT_QA_HUMAN, 
+    QA_SYSTEM
+)
+
+from ...utils import build_qa_context, render_template
 
 _QA_PASS_THRESHOLD = 5
 
@@ -46,7 +48,7 @@ def _parse_qa(text: str) -> dict[str, Any]:
         }
 
 
-async def qa_node(state: AgentState, llm: GigaChatClient) -> dict[str, Any]:
+async def qa_node(state: AgentState, llm: GigaChatClient) -> Dict[str, Any]:
     """Узел графа: рецензирование сгенерированного документа."""
     qa_attempts = state.get("qa_attempts", 0) + 1
     state["qa_attempts"] = qa_attempts
@@ -62,7 +64,7 @@ async def qa_node(state: AgentState, llm: GigaChatClient) -> dict[str, Any]:
     system, prompt = _build_contract_qa_prompt(state, document)
 
     try:
-        content = await llm.invoke([
+        content = await llm.ainvoke([
             SystemMessage(content=system),
             HumanMessage(content=prompt),
         ])
@@ -80,10 +82,13 @@ async def qa_node(state: AgentState, llm: GigaChatClient) -> dict[str, Any]:
 
         state["qa_passed"] = passed
         state["qa_feedback"] = feedback
+        if passed:
+            qa_attempts = 0
         state["qa_attempts"] = qa_attempts
         return dict(state)
 
     except Exception as e:
+        qa_attempts = 0
         state["qa_passed"] = True  # при ошибке QA — пропускаем, чтобы не блокировать
         state["qa_feedback"] = f"Ошибка рецензирования: {e}"
         state["qa_attempts"] = qa_attempts

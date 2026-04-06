@@ -1,12 +1,11 @@
-from __future__ import annotations
-
 import re
-from typing import Any
+from typing import Any, Dict
 
-from .fields import BOOLEAN_FIELDS, NUMERIC_FIELDS
-from .templates import DOCUMENT_TEMPLATES
-from .utils import format_amount, render_template
-from .state import AgentState
+from ..state import AgentState
+from ..templates import DOCUMENT_TEMPLATES
+from ..fields import BOOLEAN_FIELDS, NUMERIC_FIELDS
+
+from ...utils import format_amount, render_template
 
 
 def generate_document(state: AgentState) -> str:
@@ -22,3 +21,10 @@ def generate_document(state: AgentState) -> str:
         },
     )
     return re.sub(r"\n{3,}", "\n\n", rendered).strip()
+
+
+async def generation_node(state: AgentState) -> Dict[str, Any]:
+    """Нода для генерации текста документа."""
+    document = generate_document(state)
+    state["generated_document"] = document
+    return dict(state)
