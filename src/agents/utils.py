@@ -2,7 +2,7 @@ import json
 import re
 from typing import Any, Dict
 
-from .contract_agent.fields import REQUIRED_FIELDS_BY_TYPE
+from .fields import REQUIRED_FIELDS_BY_TYPE
 
 
 def render_template(template: str, variables: Dict[str, Any]) -> str:
