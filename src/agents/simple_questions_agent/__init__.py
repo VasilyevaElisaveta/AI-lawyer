@@ -1,3 +1,3 @@
-from .agent import SimpleQuestionAgent
+from .graph import SimpleQuestionAgent
 
 __all__ = ["SimpleQuestionAgent"]

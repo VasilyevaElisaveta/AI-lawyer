@@ -12,6 +12,6 @@ COPY ./src /app/src
 
 WORKDIR /app
 
-EXPOSE 8001
+EXPOSE 8003
 
-CMD ["uvicorn", "src.agents.contract_agent.web_app.app:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["uvicorn", "src.agents.router_agent.web_app.app:app", "--host", "0.0.0.0", "--port", "8003"]
