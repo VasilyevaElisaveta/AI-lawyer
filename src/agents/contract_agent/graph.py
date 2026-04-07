@@ -12,8 +12,9 @@ from .nodes import (
     qa_node,
     final_node
 )
-from .llm_client import GigaChatClient
 from .state import AgentState
+
+from ..llm_client import GigaChatClient
 
 
 def create_graph(llm: GigaChatClient) -> StateGraph:

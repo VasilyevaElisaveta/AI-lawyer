@@ -3,7 +3,6 @@ from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from ..llm_client import GigaChatClient
 from ..state import AgentState
 from ..prompts import (
     CLASSIFICATION_PROMPT,
@@ -17,6 +16,7 @@ from ..fields import (
     _CONTRACT_FIELDS,
 )
 
+from ...llm_client import GigaChatClient
 from ...utils import safe_parse_json, render_template
 
 

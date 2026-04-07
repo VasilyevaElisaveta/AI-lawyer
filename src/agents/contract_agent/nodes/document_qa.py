@@ -4,13 +4,13 @@ from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from ..llm_client import GigaChatClient
 from ..state import AgentState
 from ..prompts import (
     CONTRACT_QA_HUMAN, 
     QA_SYSTEM
 )
 
+from ...llm_client import GigaChatClient
 from ...utils import build_qa_context, render_template
 
 _QA_PASS_THRESHOLD = 5
