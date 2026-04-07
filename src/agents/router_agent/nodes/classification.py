@@ -1,4 +1,6 @@
-from typing import Any
+from typing import Any, Dict
+
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from ..state import RouterAgentState
 from ..prompts import (
@@ -12,7 +14,7 @@ from ...llm_client import GigaChatClient
 from ...utils import safe_parse_json, render_template
 
 
-async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> dict[str, Any]:
+async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> Dict[str, Any]:
     """
     Узел классификации: определяет категорию запроса пользователя.
     
@@ -38,14 +40,16 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> d
     
     # Вызываем LLM для классификации
     try:
-        response = await llm.complete(system=ROUTER_CLASSIFICATION_SYSTEM, prompt=prompt)
+        response = await llm.ainvoke([
+            SystemMessage(content=ROUTER_CLASSIFICATION_SYSTEM),
+            HumanMessage(content=prompt),
+        ])
         classification_result = safe_parse_json(response)
     except Exception as e:
         return {
             "error_message": f"Ошибка при классификации: {str(e)}",
             "reply": CLASSIFICATION_ERROR,
             "routed_to": "none",
-            "category": "simple_question",  # fallback
         }
     
     # Проверяем результат классификации
@@ -54,7 +58,6 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> d
             "error_message": "LLM вернул некорректный результат классификации",
             "reply": CLASSIFICATION_ERROR,
             "routed_to": "none",
-            "category": "simple_question",  # fallback
         }
     
     category = classification_result.get("category", "simple_question")
@@ -65,7 +68,7 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> d
     is_implemented = category in implemented_categories
     
     # Подготавливаем результат
-    result: dict[str, Any] = {
+    result: Dict[str, Any] = {
         "category": category,
         "classification_confidence": confidence,
         "classification_result": classification_result,

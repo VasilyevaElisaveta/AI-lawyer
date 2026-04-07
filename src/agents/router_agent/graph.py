@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 from functools import partial
 
 from langgraph.graph import END, START, StateGraph
 
 from .nodes import classification_node
 from .state import RouterAgentState
+
 from ..llm_client import GigaChatClient
 
 

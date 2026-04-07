@@ -32,11 +32,3 @@ class GigaChatClient:
     async def ainvoke(self, messages: list[BaseMessage]) -> str:
         response = await self.client.ainvoke(messages)
         return getattr(response, "content", str(response))
-
-    async def complete(self, system: str, prompt: str) -> str:
-        return await self.ainvoke(
-            [
-                BaseMessage.model_validate({"type": "system", "text": system}),
-                BaseMessage.model_validate({"type": "human", "text": prompt}),
-            ]
-        )

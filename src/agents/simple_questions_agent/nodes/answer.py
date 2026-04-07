@@ -1,4 +1,6 @@
-from typing import Any
+from typing import Any, Dict
+
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from ..state import SimpleQuestionAgentState
 from ..prompts import ANSWER_SYSTEM, ANSWER_PROMPT
@@ -7,7 +9,7 @@ from ...llm_client import GigaChatClient
 from ...utils import render_template
 
 
-async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> dict[str, Any]:
+async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> Dict[str, Any]:
     """
     Узел ответа на простой вопрос.
     
@@ -32,10 +34,12 @@ async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> d
     
     # Вызываем LLM для генерации ответа
     try:
-        reply = await llm.complete(system=ANSWER_SYSTEM, prompt=prompt)
+        reply = await llm.ainvoke([
+            SystemMessage(content=ANSWER_SYSTEM),
+            HumanMessage(content=prompt),
+        ])
     except Exception as e:
         reply = f"Ошибка при обработке вашего вопроса: {str(e)}"
-    
     return {
         "reply": reply
     }
