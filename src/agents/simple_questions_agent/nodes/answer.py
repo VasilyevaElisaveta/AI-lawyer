@@ -1,0 +1,41 @@
+from typing import Any
+
+from ..state import SimpleQuestionAgentState
+from ..prompts import ANSWER_SYSTEM, ANSWER_PROMPT
+
+from ...llm_client import GigaChatClient
+from ...utils import render_template
+
+
+async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> dict[str, Any]:
+    """
+    Узел ответа на простой вопрос.
+    
+    Использует LLM для генерации ответа на вопрос пользователя.
+    
+    Args:
+        state: Состояние агента
+        llm: Клиент LLM
+        
+    Returns:
+        Обновлённое состояние с ответом
+    """
+    user_question = state.get("raw_input", "")
+    
+    if not user_question:
+        return {
+            "reply": "Пожалуйста, задайте вопрос."
+        }
+    
+    # Подготавливаем промпт
+    prompt = render_template(ANSWER_PROMPT, {"user_question": user_question})
+    
+    # Вызываем LLM для генерации ответа
+    try:
+        reply = await llm.complete(system=ANSWER_SYSTEM, prompt=prompt)
+    except Exception as e:
+        reply = f"Ошибка при обработке вашего вопроса: {str(e)}"
+    
+    return {
+        "reply": reply
+    }
