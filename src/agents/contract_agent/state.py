@@ -14,6 +14,10 @@ class AgentState(TypedDict, total=False):
     # ── Сообщения (для будущего диалогового intake) ───────────
     messages: Annotated[list, add_messages]
 
+    # ── Управление памятью ────────────────────────────────────
+    conversation_summary: str
+    total_tokens: int
+
     # ── Тип генерируемого документа ───────────────────────────
     # "lawsuit" — исковое заявление (по умолчанию)
     # "pretrial_claim" — досудебная претензия
