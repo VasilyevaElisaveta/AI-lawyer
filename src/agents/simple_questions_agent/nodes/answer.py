@@ -1,6 +1,6 @@
 from typing import Any, Dict
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from ..state import SimpleQuestionAgentState
 from ..prompts import ANSWER_SYSTEM, ANSWER_PROMPT
@@ -40,6 +40,12 @@ async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> D
         ])
     except Exception as e:
         reply = f"Ошибка при обработке вашего вопроса: {str(e)}"
+
+    messages = state.get("messages", []) or []
+    messages.append(AIMessage(content=reply))
+    state["messages"] = messages
+
     return {
-        "reply": reply
+        "reply": reply,
+        "messages": messages,
     }
