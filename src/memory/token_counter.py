@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from langchain_core.messages import BaseMessage
 
-from app.services.llm_client import GigaChatClient
+from src.agents.llm_client import GigaChatClient
 
 
 class TokenCounter:

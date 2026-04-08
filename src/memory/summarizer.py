@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
-from app.services.llm_client import GigaChatClient
+from src.agents.llm_client import GigaChatClient
 
 
 async def summarize_messages(
     messages,
     llm: GigaChatClient,
 ) -> str:
+
+    # Преобразуем сообщения в строку для промпта
+    dialog_text = "\n".join([f"{msg.type}: {msg.content}" for msg in messages])
 
     prompt = HumanMessage(
         content=f"""
@@ -24,11 +27,11 @@ async def summarize_messages(
 
 Диалог:
 
-{messages}
+{dialog_text}
 """
     )
 
-    summary = await llm.invoke(
+    summary = await llm.ainvoke(
         [prompt]
     )
 

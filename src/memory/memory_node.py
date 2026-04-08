@@ -4,16 +4,16 @@ from typing import Any
 
 from langchain_core.messages import BaseMessage
 
-from memory.config import (
+from .config import (
     SUMMARY_TRIGGER_TOKENS,
     KEEP_LAST_MESSAGES,
 )
 
-from memory.token_counter import TokenCounter
-from memory.summarizer import summarize_messages
+from .token_counter import TokenCounter
+from .summarizer import summarize_messages
 
-from app.core.state import AgentState
-from app.services.llm_client import GigaChatClient
+from src.agents.contract_agent.state import AgentState
+from src.agents.llm_client import GigaChatClient
 
 
 async def memory_node(
@@ -36,10 +36,7 @@ async def memory_node(
         messages
     )
 
-    state.set(
-        "total_tokens",
-        tokens,
-    )
+    state["total_tokens"] = tokens
 
     if tokens < SUMMARY_TRIGGER_TOKENS:
 
@@ -63,24 +60,12 @@ async def memory_node(
         "",
     )
 
-    merged_summary = (
-        previous_summary
-        + "\n"
-        + summary
-    )
-
-    state.set(
-        "conversation_summary",
-        merged_summary,
-    )
+    state["total_tokens"] = tokens
 
     new_messages = messages[
         -KEEP_LAST_MESSAGES:
     ]
 
-    state.set(
-        "messages",
-        new_messages,
-    )
-
-    return state
+    return {
+        "messages": new_messages,
+    }
