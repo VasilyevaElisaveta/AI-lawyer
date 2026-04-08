@@ -1,9 +1,8 @@
-from __future__ import annotations
-
 from functools import partial
 from typing import Any, Literal
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.checkpoint.memory import MemorySaver
 
 from .nodes import (
     intake_node, 
@@ -15,7 +14,6 @@ from .nodes import (
 from .state import AgentState
 
 from ..llm_client import GigaChatClient
-from ..memory.memory_node import memory_node
 
 
 def create_graph(llm: GigaChatClient) -> StateGraph:
@@ -23,7 +21,6 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     graph = StateGraph(AgentState)
 
     # Добавляем ноды
-    graph.add_node("memory", partial(memory_node, llm=llm))
     graph.add_node("intake", partial(intake_node, llm=llm))
     graph.add_node("validation", validation_node)
     graph.add_node("generation", generation_node)
@@ -31,8 +28,7 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     graph.add_node("final", final_node)
 
     # Определяем рёбра
-    graph.add_edge(START, "memory")
-    graph.add_edge("memory", "intake")
+    graph.add_edge(START, "intake")
     graph.add_edge("intake", "validation")
 
     # Conditional от validation
@@ -43,8 +39,7 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
 
     graph.add_conditional_edges("validation", validation_router)
 
-    graph.add_edge("generation", "memory")
-    graph.add_edge("memory", "qa")
+    graph.add_edge("generation", "qa")
 
     # Conditional от qa
     def qa_router(state: AgentState) -> Literal["generation", "final"]:
@@ -63,23 +58,35 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
 class ContractAgent:
     def __init__(self, llm: GigaChatClient | None = None) -> None:
         self.llm = llm or GigaChatClient()
-        self.graph = create_graph(self.llm).compile()
+        # Временное решение для сохранения состояния между вызовами.
+        self.memory = MemorySaver()
+        # В проде заменить на RedisSaver или другое долговременное хранилище.
+        # from langgraph.checkpoint.redis import RedisSaver
+        # self.memory = RedisSaver.from_conn_string(
+        #     "redis://localhost:6379",
+        #     key_prefix=f"contract_agent:"
+        # )
+        self.graph = create_graph(self.llm).compile(checkpointer=self.memory)
 
-    async def process_user_message(self, user_message: str, state: AgentState | None = None) -> dict[str, Any]:
-        if state is None:
-            state = AgentState()
-        state["raw_input"] = user_message
+    def _build_input_state(self, user_message: str) -> dict:
+        return {
+            "raw_input": user_message
+        }
 
-        # Запускаем граф
-        result = await self.graph.ainvoke(state)
-
-        # Универсальный ответ для внешнего маршрутизатора
+    async def process_user_message(self, user_message: str, thread_id: str) -> dict[str, Any]:
+        input_state = self._build_input_state(user_message)
+        result = await self.graph.ainvoke(
+            input_state,
+            config={
+                "configurable": {
+                    "thread_id": thread_id
+                }
+            }
+        )
         if result.get("response_to_user"):
             result["reply"] = result["response_to_user"]
         else:
             result["reply"] = result.get("final_document", "")
-
-        # Флаг, который показывает, что агент сам обработал запрос
         result["handled_by_agent"] = True
         result["document_created"] = bool(result.get("generated_document"))
         return result
