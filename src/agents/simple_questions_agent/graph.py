@@ -8,6 +8,7 @@ from .nodes import answer_node
 from .state import SimpleQuestionAgentState
 
 from ..llm_client import GigaChatClient
+from src.memory.memory_node import memory_node
 
 
 def create_graph(llm: GigaChatClient) -> StateGraph:
@@ -21,11 +22,12 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     """
     graph = StateGraph(SimpleQuestionAgentState)
 
-    # Добавляем узел ответа
+    graph.add_node("memory", partial(memory_node, llm=llm))
     graph.add_node("answer", partial(answer_node, llm=llm))
 
     # Определяем рёбра
-    graph.add_edge(START, "answer")
+    graph.add_edge(START, "memory")
+    graph.add_edge("memory", "answer")
     graph.add_edge("answer", END)
 
     return graph

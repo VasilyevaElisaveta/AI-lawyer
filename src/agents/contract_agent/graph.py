@@ -14,6 +14,7 @@ from .nodes import (
 from .state import AgentState
 
 from ..llm_client import GigaChatClient
+from src.memory.memory_node import memory_node
 
 
 def create_graph(llm: GigaChatClient) -> StateGraph:
@@ -21,6 +22,7 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     graph = StateGraph(AgentState)
 
     # Добавляем ноды
+    graph.add_node("memory", partial(memory_node, llm=llm))
     graph.add_node("intake", partial(intake_node, llm=llm))
     graph.add_node("validation", validation_node)
     graph.add_node("generation", generation_node)
@@ -28,7 +30,8 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     graph.add_node("final", final_node)
 
     # Определяем рёбра
-    graph.add_edge(START, "intake")
+    graph.add_edge(START, "memory")
+    graph.add_edge("memory", "intake")
     graph.add_edge("intake", "validation")
 
     # Conditional от validation
