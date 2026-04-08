@@ -33,7 +33,15 @@ def format_amount(value: Any) -> str:
 
 
 def build_qa_context(state: dict[str, Any]) -> str:
-    data = {k: v for k, v in state.items() if v is not None and v != ""}
+    data = {}
+    for k, v in state.items():
+        if v is None or v == "":
+            continue
+        if k == "messages":
+            # Конвертируем сообщения в строки для JSON
+            data[k] = [f"{msg.type}: {msg.content}" for msg in v]
+        else:
+            data[k] = v
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
