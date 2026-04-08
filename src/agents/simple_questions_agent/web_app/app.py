@@ -1,10 +1,15 @@
 import sys
 from pathlib import Path
+from pydantic import BaseModel
 
 import fastapi
-from fastapi import Request
 
 from ..graph import SimpleQuestionAgent
+
+
+class MessageRequest(BaseModel):
+    user_id: str
+    user_message: str
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -12,28 +17,24 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 app = fastapi.FastAPI()
-router_agent = SimpleQuestionAgent()
+simple_question_agent = SimpleQuestionAgent()
 
 
 @app.get("/health")
 async def health_check():
     """
-    Эндпоинт для проверки работоспособности маршрутизирующего агента.
+    Эндпоинт для проверки работоспособности агента по простым вопросам.
     """
     return {"status": "ok"}
 
 
-@app.post("/router_agent")
-async def router_agent_endpoint(request: Request):
-    """
-    Эндпоинт для маршрутизирующего агента.
-    
-    Принимает POST-запрос с JSON, содержащим:
-    - user_message: текст сообщения от пользователя
-    """
-    data = await request.json()
-    user_message = data.get("user_message", "")
-
-    result = await router_agent.process_user_message(user_message)
-    
-    return {"received_message": user_message}
+@app.post("/simple_question_agent")
+async def simple_question_agent_endpoint(request: MessageRequest):
+    result = await simple_question_agent.process_user_message(
+        user_message=request.user_message,
+        thread_id=request.user_id,
+    )
+    return {
+        "request": request,
+        "response": result
+    }

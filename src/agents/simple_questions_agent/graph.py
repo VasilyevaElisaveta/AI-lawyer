@@ -1,6 +1,8 @@
 from functools import partial
+from typing import Any
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.checkpoint.memory import MemorySaver
 
 from .nodes import answer_node
 from .state import SimpleQuestionAgentState
@@ -30,68 +32,32 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
 
 
 class SimpleQuestionAgent:
-    """
-    Агент для ответов на простые вопросы на основе LanggGraph.
-    
-    Ответственен за:
-    1. Получение вопроса пользователя
-    2. Генерацию ответа с помощью LLM
-    3. Возврат ответа пользователю
-    """
-
     def __init__(self, llm: GigaChatClient | None = None) -> None:
-        """
-        Инициализирует агента простых вопросов.
-        
-        Args:
-            llm: Клиент LLM (GigaChat). Если не предоставлен, создаёт новый экземпляр.
-        """
         self.llm = llm or GigaChatClient()
-        self.graph = create_graph(self.llm).compile()
+        # Временное решение для сохранения состояния между вызовами.
+        self.memory = MemorySaver()
+        # В проде заменить на RedisSaver или другое долговременное хранилище.
+        # from langgraph.checkpoint.redis import RedisSaver
+        # self.memory = RedisSaver.from_conn_string(
+        #     "redis://localhost:6379",
+        #     key_prefix=f"contract_agent:"
+        # )
+        self.graph = create_graph(self.llm).compile(checkpointer=self.memory)
 
-    async def answer_question(self, question: str, state: SimpleQuestionAgentState | None = None) -> str:
-        """
-        Генерирует ответ на вопрос пользователя.
-        
-        Args:
-            question: Вопрос пользователя
-            state: Опциональное состояние (для контекста из предыдущих сообщений)
-            
-        Returns:
-            Строка с ответом на вопрос
-        """
-        if state is None:
-            state = SimpleQuestionAgentState()
-        
-        state["raw_input"] = question
-
-        # Запускаем граф
-        result = await self.graph.ainvoke(state)
-
-        return result.get("reply", "")
-
-    async def process_user_message(self, user_message: str, state: SimpleQuestionAgentState | None = None) -> dict:
-        """
-        Обрабатывает сообщение пользователя (альтернативное имя для совместимости).
-        
-        Args:
-            user_message: Сообщение пользователя
-            state: Опциональное состояние
-            
-        Returns:
-            Dict с результатами обработки:
-            - reply: Ответ пользователю
-            - handled_by_agent: Всегда True (для совместимости)
-        """
-        if state is None:
-            state = SimpleQuestionAgentState()
-        
-        state["raw_input"] = user_message
-
-        # Запускаем граф
-        result = await self.graph.ainvoke(state)
-
+    def _build_input_state(self, user_message: str) -> dict:
         return {
-            "reply": result.get("reply", ""),
-            "handled_by_agent": True,
+            "raw_input": user_message
         }
+
+    async def process_user_message(self, user_message: str, thread_id: str) -> dict[str, Any]:
+        input_state = self._build_input_state(user_message)
+        result = await self.graph.ainvoke(
+            input_state,
+            config={
+                "configurable": {
+                    "thread_id": thread_id
+                }
+            }
+        )
+        result["handled_by_agent"] = True
+        return result

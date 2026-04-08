@@ -1,10 +1,15 @@
 import sys
 from pathlib import Path
+from pydantic import BaseModel
 
 import fastapi
-from fastapi import Request
 
 from ..graph import RouterAgent
+
+
+class MessageRequest(BaseModel):
+    user_id: str
+    user_message: str
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -24,16 +29,12 @@ async def health_check():
 
 
 @app.post("/router_agent")
-async def router_agent_endpoint(request: Request):
-    """
-    Эндпоинт для маршрутизирующего агента.
-    
-    Принимает POST-запрос с JSON, содержащим:
-    - user_message: текст сообщения от пользователя
-    """
-    data = await request.json()
-    user_message = data.get("user_message", "")
-
-    result = await router_agent.process_user_message(user_message)
-    
-    return {"received_message": user_message}
+async def router_agent_endpoint(request: MessageRequest):
+    result = await router_agent.process_user_message(
+        user_message=request.user_message,
+        thread_id=request.user_id,
+    )
+    return {
+        "request": request,
+        "response": result
+    }
