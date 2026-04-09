@@ -23,9 +23,9 @@ from ...utils import safe_parse_json, render_template
 def _map_structured(data: Dict, field_map: Dict[str, str]) -> Dict[str, Any]:
     """Маппинг полей из input_data в state по заданной карте полей."""
     updates: dict[str, Any] = {}
-    for src, dst in field_map.items():
-        if src in data and data[src] is not None:
-            updates[dst] = data[src]
+    for key, arg in field_map.items():
+        if key in data and data[key] is not None:
+            updates[arg] = data[key]
     return updates
 
 
@@ -93,7 +93,7 @@ async def _extract_from_text(text: str, state: AgentState, llm: GigaChatClient) 
             return {"contract_subject": text}
 
 
-async def intake_node(state: AgentState, llm: GigaChatClient) -> dict[str, Any]:
+async def contract_intake_node(state: AgentState, llm: GigaChatClient) -> dict[str, Any]:
     """Узел графа: сбор и структурирование входных данных."""
     # 1. Структурированный ввод — приоритет
     input_data: dict | None = state.get("input_data")

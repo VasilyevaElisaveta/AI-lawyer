@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
@@ -7,7 +5,8 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from .config import SUMMARY_TRIGGER_TOKENS, KEEP_LAST_MESSAGES
 from .token_counter import TokenCounter
 from .summarizer import summarize_messages
-from src.agents.llm_client import GigaChatClient
+
+from ..agents.llm_client import GigaChatClient
 
 
 async def memory_node(

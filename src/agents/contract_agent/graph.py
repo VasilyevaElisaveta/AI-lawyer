@@ -5,7 +5,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 
 from .nodes import (
-    intake_node, 
+    contract_intake_node, 
     validation_node, 
     generation_node, 
     qa_node,
@@ -24,7 +24,7 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
 
     # Добавляем ноды
     graph.add_node("memory", partial(memory_node, llm=llm))
-    graph.add_node("intake", partial(intake_node, llm=llm))
+    graph.add_node("intake", partial(contract_intake_node, llm=llm))
     graph.add_node("validation", validation_node)
     graph.add_node("generation", generation_node)
     graph.add_node("qa", partial(qa_node, llm=llm))
