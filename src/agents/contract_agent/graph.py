@@ -14,7 +14,8 @@ from .nodes import (
 from .state import AgentState
 
 from ..llm_client import GigaChatClient
-from src.memory.memory_node import memory_node
+
+from ...memory import memory_node
 
 
 def create_graph(llm: GigaChatClient) -> StateGraph:

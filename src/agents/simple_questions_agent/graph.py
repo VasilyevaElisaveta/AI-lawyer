@@ -8,7 +8,8 @@ from .nodes import answer_node
 from .state import SimpleQuestionAgentState
 
 from ..llm_client import GigaChatClient
-from src.memory.memory_node import memory_node
+
+from ...memory import memory_node
 
 
 def create_graph(llm: GigaChatClient) -> StateGraph:
