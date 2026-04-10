@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from .fields import REQUIRED_FIELDS_BY_TYPE
 
@@ -80,3 +80,24 @@ def safe_parse_json(text: str) -> dict[str, Any]:
             except json.JSONDecodeError:
                 return {}
         return {}
+    
+
+def messages_to_str(messages: List[Dict]) -> str:
+    role_map = {
+        "human": "User",
+        "ai": "Assistant",
+        "system": "System"
+    }
+
+    formatted_messages = []
+
+    for msg in messages:
+        role = role_map.get(msg.get("type", ""), msg.get("type", "unknown"))
+        content = msg.get("content", "").strip()
+
+        if not content:
+            continue
+
+        formatted_messages.append(f"{role}: {content}")
+
+    return "\n".join(formatted_messages)
