@@ -1,10 +1,4 @@
-from langchain_core.prompts import ChatMessagePromptTemplate
-
-
-async def question_answer_node(state, llm):
-    """
-    Собирает промпт из полученных данных, отправляет его LLM, получает ответ от неё и добавляет его в state.
-    """
+async def question_answer_node(state):
     d = {
         "answer": state["decision"].get("answer", "")
     }

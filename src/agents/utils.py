@@ -55,6 +55,10 @@ def find_missing_required_fields(state: Dict[str, Any], field_name: str) -> list
     return missing
 
 
+def normalize_braces(text: str) -> str:
+    return text.replace("{{", "{").replace("}}", "}")
+
+
 def _parse_json(text: str) -> dict:
     """Извлекает JSON из ответа LLM (может быть обёрнут в markdown)."""
     # Пробуем ```json ... ```
@@ -70,6 +74,7 @@ def _parse_json(text: str) -> dict:
 
 
 def safe_parse_json(text: str) -> dict[str, Any]:
+    text = normalize_braces(text)
     try:
         return _parse_json(text)
     except Exception:

@@ -5,7 +5,7 @@ from .promtps import (
     DECISION_PROMPT, DECISION_SYSTEM, ANSWER_PROMPT, ANSWER_SYSTEM
 )
 
-from ....utils import safe_parse_json, safe_parse_list_int
+from ....utils import safe_parse_json
 
 
 async def decision_node(state, llm):
@@ -48,8 +48,7 @@ async def answer_with_docs_node(state, llm):
     raw_input = state.get("raw_input", "")
     decision = state.get("decision", "")
     docs = state.get("generated_documents", [])
-    document_ids_str = decision.get("document_ids", "[-1]")
-    document_ids = safe_parse_list_int(document_ids_str)
+    document_ids = decision.get("document_ids", [-1])
 
     selected_docs = [
         docs[i] for i in document_ids
