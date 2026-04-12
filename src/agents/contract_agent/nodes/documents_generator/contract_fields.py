@@ -1,3 +1,4 @@
+CONTRACT_FIELDS = \
 {
   "nda": {
     "required": [
@@ -22,26 +23,32 @@
         "title": "Ответственность сторон"
       }
     ],
-    "optional": {
-      "term": {
+    "optional": [
+      {
+        "id": "term",
         "title": "Срок действия соглашения"
       },
-      "penalty": {
+      {
+        "id": "penalty",
         "title": "Штрафные санкции"
       },
-      "exceptions": {
+      {
+        "id": "exceptions",
         "title": "Исключения из конфиденциальной информации"
       },
-      "dispute_resolution": {
+      {
+        "id": "dispute_resolution",
         "title": "Порядок разрешения споров"
       },
-      "governing_law": {
+      {
+        "id": "governing_law",
         "title": "Применимое право"
       },
-      "non_compete": {
+      {
+        "id": "non_compete",
         "title": "Ограничение конкуренции"
       }
-    }
+    ]
   },
   "rent": {
     "required": [
@@ -66,35 +73,44 @@
         "title": "Права и обязанности сторон"
       }
     ],
-    "optional": {
-      "deposit": {
+    "optional": [
+      {
+        "id": "deposit",
         "title": "Обеспечительный платеж"
       },
-      "utilities": {
+      {
+        "id": "utilities",
         "title": "Коммунальные услуги"
       },
-      "maintenance": {
+      {
+        "id": "maintenance",
         "title": "Содержание и ремонт"
       },
-      "termination": {
+      {
+        "id": "termination",
         "title": "Условия расторжения"
       },
-      "liability": {
+      {
+        "id": "liability",
         "title": "Ответственность сторон"
       },
-      "inspection": {
+      {
+        "id": "inspection",
         "title": "Порядок передачи имущества"
       },
-      "sublease": {
+      {
+        "id": "sublease",
         "title": "Субаренда"
       },
-      "pets": {
+      {
+        "id": "pets",
         "title": "Условия содержания животных"
       },
-      "dispute_resolution": {
+      {
+        "id": "dispute_resolution",
         "title": "Порядок разрешения споров"
       }
-    }
+    ]
   },
   "services": {
     "required": [
@@ -119,34 +135,43 @@
         "title": "Срок оказания услуг"
       }
     ],
-    "optional": {
-      "acceptance": {
+    "optional": [
+      {
+        "id": "acceptance",
         "title": "Порядок приемки услуг"
       },
-      "liability": {
+      {
+        "id": "liability",
         "title": "Ответственность сторон"
       },
-      "penalty": {
+      {
+        "id": "penalty",
         "title": "Штрафные санкции"
       },
-      "confidentiality": {
+      {
+        "id": "confidentiality",
         "title": "Конфиденциальность"
       },
-      "ip_rights": {
+      {
+        "id": "ip_rights",
         "title": "Права на результаты работ"
       },
-      "termination": {
+      {
+        "id": "termination",
         "title": "Условия расторжения"
       },
-      "force_majeure": {
+      {
+        "id": "force_majeure",
         "title": "Форс-мажор"
       },
-      "subcontracting": {
+      {
+        "id": "subcontracting",
         "title": "Привлечение третьих лиц"
       },
-      "dispute_resolution": {
+      {
+        "id": "dispute_resolution",
         "title": "Порядок разрешения споров"
       }
-    }
+    ]
   }
 }

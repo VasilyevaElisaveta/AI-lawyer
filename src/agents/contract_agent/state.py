@@ -5,32 +5,16 @@ from typing import Annotated, Any, TypedDict
 from langgraph.graph.message import add_messages
 
 
-class AgentState(TypedDict, total=False):
-    """
-    total=False  →  все поля опциональны на уровне TypedDict.
-    В коде узлов используем state.get("field", default).
-    """
-
-    # ── Сообщения (для будущего диалогового intake) ───────────
+class ContractAgentState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
 
-    # ── Управление памятью ────────────────────────────────────
     conversation_summary: str
     total_tokens: int
 
-    # ── Тип генерируемого документа ───────────────────────────
-    # "lawsuit" — исковое заявление (по умолчанию)
-    # "pretrial_claim" — досудебная претензия
-    # "contract" — договор
     doc_type: str
 
-    # ── Входные данные ────────────────────────────────────────
-    raw_input: str                  # свободный текст от пользователя
-    input_data: dict[str, Any]      # структурированный ввод (от маршрутизатора)
-
-    # ══════════════════════════════════════════════════════════
-    #  Поля для ДОГОВОРА
-    # ══════════════════════════════════════════════════════════
+    raw_input: str
+    input_data: dict[str, Any]
 
     party_a_info: str
     party_b_info: str
@@ -39,35 +23,39 @@ class AgentState(TypedDict, total=False):
     governing_law: str
     contract_amount: float
 
-    # Используем аналогичные поля, как для исков, но адаптированные для договора
-    # Можно добавить специфические поля позже
+    contract_type: str
+    contract_fields: dict
+    collected_fields: dict
 
-    # ══════════════════════════════════════════════════════════
-    #  Общие поля (для обоих типов документов)
-    # ══════════════════════════════════════════════════════════
+    case_type: str
+    case_category: str
 
-    # ── Результаты классификации ──────────────────────────────
-    case_type: str                  # "civil" | "arbitration" (только для исков)
-    case_category: str              # debt_collection, employment, consumer, ...
-
-    # ── Валидация ─────────────────────────────────────────────
     validation_errors: list[str]
-    validation_warnings: list[str]  # мягкие предупреждения (рекомендации)
+    validation_warnings: list[str]
     is_valid: bool
-    response_to_user: str | None    # сообщение пользователю при недостающих данных
+    response_to_user: str | None
 
-    # ── Правовое исследование ─────────────────────────────────
     applicable_laws: str
     legal_positions: str
 
-    # ── Генерация ─────────────────────────────────────────────
     generated_documents: list[str]
     summarized_documents: list[str]
 
-    # ── Проверка качества ─────────────────────────────────────
     qa_passed: bool
     qa_feedback: str
     qa_attempts: int
 
-    # ── Финальный результат ───────────────────────────────────
     final_document: str
+
+    document_template: dict[str, Any]
+    generated_markdown: str
+    markdown_validation_errors: list[str]
+    markdown_is_valid: bool
+
+    generated_docx_path: str
+    generated_docx_name: str
+    generated_docx_base64: str
+
+    document_summary: str
+    summary_source: str
+    summary_attempts: int

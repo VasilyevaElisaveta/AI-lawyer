@@ -59,6 +59,14 @@ def normalize_braces(text: str) -> str:
     return text.replace("{{", "{").replace("}}", "}")
 
 
+def _normalize_space(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, indent=2)
+    return str(value).strip()
+
+
 def _parse_json(text: str) -> dict:
     """Извлекает JSON из ответа LLM (может быть обёрнут в markdown)."""
     # Пробуем ```json ... ```

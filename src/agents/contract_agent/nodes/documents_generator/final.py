@@ -2,7 +2,7 @@ from typing import Any, Dict
 
 from langchain_core.messages import AIMessage
 
-from ..state import AgentState
+from ...state import AgentState
 
 
 async def final_node(state: AgentState) -> Dict[str, Any]:
