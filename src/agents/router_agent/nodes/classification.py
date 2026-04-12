@@ -2,13 +2,14 @@ from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from ..state import RouterAgentState
-from ..prompts import (
+from .prompts import (
     ROUTER_CLASSIFICATION_SYSTEM,
     ROUTER_CLASSIFICATION_PROMPT,
     CATEGORY_NOT_IMPLEMENTED,
     CLASSIFICATION_ERROR,
 )
+
+from ..state import RouterAgentState
 
 from ...llm_client import GigaChatClient
 from ...utils import safe_parse_json, render_template
