@@ -101,3 +101,18 @@ def messages_to_str(messages: List[Dict]) -> str:
         formatted_messages.append(f"{role}: {content}")
 
     return "\n".join(formatted_messages)
+
+
+def documents_to_str(documents: List[str]) -> str:
+    formatted_messages = []
+    for i, document in enumerate(documents):
+        formatted_messages.append(f"{i}: ")
+        formatted_messages.append(document)
+    return "\n".join(formatted_messages)
+
+
+def safe_parse_list_int(output: str) -> List[int]:
+    if not output:
+        return []
+    numbers = re.findall(r'-?\d+', output)
+    return [int(n) for n in numbers]

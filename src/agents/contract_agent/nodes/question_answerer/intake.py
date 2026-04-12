@@ -1,4 +1,4 @@
-from ....utils import messages_to_str
+from ....utils import messages_to_str, documents_to_str
 
 
 async def question_intake_node(state):
@@ -6,11 +6,13 @@ async def question_intake_node(state):
     Используется в случаях, если агенту по договорам задали какой-либо вопрос, а не дали задание на генерацию документа.
     Собирает и валидирует необходимые поля из state.
     """
-    raw_input = state.get("raw_input", "")
-    if not raw_input:
-        return {"error": "Нет входных данных. Передайте raw_input или input_data."}
-    summarized_data = state.get("conversation_summary", "")
-    if not summarized_data:
-        print("conversation_summary not in state")
     messages = state.get("messages", [])
     messages_str = messages_to_str(messages)
+    summarized_documents = state.get("summarized_documents", [])
+    summarized_documents_str = documents_to_str(summarized_documents)
+    d = {
+        "messages_str": messages_str,
+        "summarized_documents_str": summarized_documents_str
+    }
+    state.update(d)
+    return dict(state)

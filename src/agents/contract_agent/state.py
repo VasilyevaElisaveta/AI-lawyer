@@ -61,7 +61,8 @@ class AgentState(TypedDict, total=False):
     legal_positions: str
 
     # ── Генерация ─────────────────────────────────────────────
-    generated_document: str
+    generated_documents: list[str]
+    summarized_documents: list[str]
 
     # ── Проверка качества ─────────────────────────────────────
     qa_passed: bool
