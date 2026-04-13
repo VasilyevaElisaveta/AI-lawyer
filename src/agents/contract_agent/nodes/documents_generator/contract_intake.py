@@ -37,7 +37,7 @@ def _update_collected_fields(state, new_data):
     return collected
 
 
-async def contract_intake_node(state, llm):
+async def contract_generator_intake_node(state, llm):
     raw_input = state.get("raw_input", "")
     if not raw_input:
         return {"error": "Нет входных данных. Передайте raw_input."}
@@ -112,7 +112,7 @@ async def contract_intake_node(state, llm):
     return state
 
 
-def validation_router(state) -> Literal["generation", "final"]:
+def contract_generator_validation_router(state) -> Literal["generation", "final"]:
     contract_type = state.get("contract_type")
     collected = state.get("collected_fields", {})
     if not contract_type:

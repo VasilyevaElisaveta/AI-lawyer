@@ -1,17 +1,11 @@
 from functools import partial
-from typing import Any, Literal
+from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 
-from .nodes import (
-    contract_intake_node, 
-    validation_node, 
-    generation_node, 
-    qa_node,
-    final_node
-)
-from .state import AgentState
+from .nodes import *
+from .state import ContractAgentState
 
 from ..llm_client import GigaChatClient
 
@@ -20,42 +14,39 @@ from ...memory import memory_node
 
 def create_graph(llm: GigaChatClient) -> StateGraph:
     """Создаёт граф агента."""
-    graph = StateGraph(AgentState)
+    graph = StateGraph(ContractAgentState)
 
-    # Добавляем ноды
-    graph.add_node("memory", partial(memory_node, llm=llm))
-    graph.add_node("intake", partial(contract_intake_node, llm=llm))
-    graph.add_node("validation", validation_node)
-    graph.add_node("generation", generation_node)
-    graph.add_node("qa", partial(qa_node, llm=llm))
-    graph.add_node("final", final_node)
+    graph.add_node("summarization", partial(memory_node, llm=llm))
 
-    # Определяем рёбра
-    graph.add_edge(START, "memory")
-    graph.add_edge("memory", "intake")
-    graph.add_edge("intake", "validation")
+    graph.add_node("classification", partial(contract_classification_node, llm=llm))
 
-    # Conditional от validation
-    def validation_router(state: AgentState) -> Literal["generation", "final"]:
-        if state.get("is_valid", False):
-            return "generation"
-        return "final"
+    graph.add_node("generator_intake", partial(contract_generator_intake_node, llm=llm))
+    graph.add_node("markdown_generation", partial(contract_markdown_generation_node, llm=llm))
+    graph.add_node("markdown_validation", contract_markdown_validation_node)
+    graph.add_node("docx_generation", contract_docx_generation_node)
+    graph.add_node("document_summary", partial(contract_document_summary_node, llm=llm))
+    graph.add_node("generator_final", contract_generator_final_node)
 
-    graph.add_conditional_edges("validation", validation_router)
+    graph.add_node("question_intake", contract_question_intake_node)
+    graph.add_node("answer_decision", partial(contract_answer_decision_node, llm=llm))
+    graph.add_node("answer_with_docs", partial(contract_answer_with_docs_node, llm=llm))
+    graph.add_node("question_answer", partial(contract_question_answer_node, llm=llm))
 
-    graph.add_edge("generation", "qa")
+    graph.add_edge(START, "summarization")
+    graph.add_edge("summarization", "classification")
+    graph.add_conditional_edges("classification", contract_classification_router)
+    
+    graph.add_edge("generator_intake", "markdown_generation")
+    graph.add_edge("markdown_generation", "markdown_validation")
+    graph.add_conditional_edges("markdown_validation", contract_markdown_validation_router)
+    graph.add_edge("docx_generation", "document_summary")
+    graph.add_edge("document_summary", "generator_final")
+    graph.add_edge("generator_final", END)
 
-    # Conditional от qa
-    def qa_router(state: AgentState) -> Literal["generation", "final"]:
-        qa_attempts = state.get("qa_attempts", 0)
-        if qa_attempts >= 3 or state.get("qa_passed", False):
-            return "final"
-        return "generation"  # перегенерация
-
-    graph.add_conditional_edges("qa", qa_router)
-
-    graph.add_edge("final", END)
-
+    graph.add_edge("question_intake", "answer_decision")
+    graph.add_conditional_edges("answer_decison", contract_document_answer_decision_router)
+    graph.add_edge("answer_with_docs", END)
+    graph.add_edge("question_answer", END)
     return graph
 
 

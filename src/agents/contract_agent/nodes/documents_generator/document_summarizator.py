@@ -3,7 +3,6 @@ import re
 from langchain_core.prompts import ChatPromptTemplate
 
 from .prompts import CONTRACT_SUMMARY_SYSTEM, CONTRACT_SUMMARY_PROMPT
-from .documents_templates import CONTRACT_TEMPLATES
 
 from ....utils import _normalize_space
 
@@ -15,7 +14,7 @@ def _strip_code_fence(text: str) -> str:
     return t.strip()
 
 
-async def contract_summary_node(state, llm):
+async def contract_document_summary_node(state, llm):
     contract_type = state.get("contract_type")
     markdown = _normalize_space(state.get("generated_markdown", ""))
 

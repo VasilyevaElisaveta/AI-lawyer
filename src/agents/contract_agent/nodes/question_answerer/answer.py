@@ -8,7 +8,7 @@ from .promtps import (
 from ....utils import safe_parse_json
 
 
-async def decision_node(state, llm):
+async def contract_answer_decision_node(state, llm):
     raw_input = state.get("raw_input", "")
     if not raw_input:
         return {"error": "Нет входных данных. Передайте raw_input или input_data."}
@@ -37,14 +37,14 @@ async def decision_node(state, llm):
     return state
 
 
-def route_decision(state):
+def contract_document_answer_decision_router(state):
     if state["decision"].get("need_documents", False):
-        return "with_docs"
+        return "answer_with_docs"
     else:
-        return "final"
+        return "question_answer"
 
 
-async def answer_with_docs_node(state, llm):
+async def contract_answer_with_docs_node(state, llm):
     raw_input = state.get("raw_input", "")
     decision = state.get("decision", "")
     docs = state.get("generated_documents", [])

@@ -12,7 +12,7 @@ def clear_results_before_end(state):
     state["current_node"] = None
 
 
-async def final_node(state: ContractAgentState) -> Dict[str, Any]:
+async def contract_generator_final_node(state: ContractAgentState) -> Dict[str, Any]:
     """Финальная нода: возврат документа или ответа пользователю."""
     if state.get("response_to_user"):
         final_text = state["response_to_user"]

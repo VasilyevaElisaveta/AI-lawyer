@@ -17,7 +17,7 @@ async def contract_classification_node(state, llm):
 
     chain = prompt | llm
 
-    desicion = await chain.ainvoke()
+    desicion = await chain.ainvoke(input_d)
     d = {
         "contract_class": desicion,
     }
@@ -25,5 +25,10 @@ async def contract_classification_node(state, llm):
     return dict(state)
 
 
-def route_contract_class(state):
-    return state.get("contract_class", "question")
+def contract_classification_router(state):
+    desicion = state.get("contract_class", "question")
+    desicion_node = {
+        "generation": "generator_intake",
+        "question": "question_intake"
+    }.get(desicion)
+    return desicion_node

@@ -1,7 +1,7 @@
 from ....utils import messages_to_str, documents_to_str
 
 
-async def question_intake_node(state):
+async def contract_question_intake_node(state):
     """
     Используется в случаях, если агенту по договорам задали какой-либо вопрос, а не дали задание на генерацию документа.
     Собирает и валидирует необходимые поля из state.

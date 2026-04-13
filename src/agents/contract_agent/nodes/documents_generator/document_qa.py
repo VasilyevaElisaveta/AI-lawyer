@@ -1,5 +1,5 @@
 import re
-from typing import Any, Literal
+from typing import Literal
 
 from .documents_templates import CONTRACT_TEMPLATES
 
@@ -90,5 +90,5 @@ def contract_markdown_validation_node(state):
     return state
 
 
-def markdown_validation_router(state) -> Literal["markdown_generation", "docx_generation"]:
+def contract_markdown_validation_router(state) -> Literal["markdown_generation", "docx_generation"]:
     return "docx_generation" if state.get("markdown_is_valid") else "markdown_generation"

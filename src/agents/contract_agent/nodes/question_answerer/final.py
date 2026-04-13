@@ -1,4 +1,4 @@
-async def question_answer_node(state):
+async def contract_question_answer_node(state):
     d = {
         "answer": state["decision"].get("answer", "")
     }

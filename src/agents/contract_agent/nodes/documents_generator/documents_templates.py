@@ -1,4 +1,5 @@
-CONTRACT_TEMPLATES = {
+CONTRACT_TEMPLATES = \
+{
     "nda": {
         "document_title": "Соглашение о неразглашении конфиденциальной информации (NDA)",
         "sections": [
