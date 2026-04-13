@@ -16,6 +16,10 @@ CLASSIFY_PROMPT = \
 """
 Текст пользователя:
 {raw_input}
+Несколько предыдущих сообщений:
+{messages_str}
+Суммаризация диалога (если есть):
+{conversation_summary}
 """
 
 EXTRACT_SYSTEM = \
@@ -44,6 +48,10 @@ EXTRACT_PROMPT = \
 {target_fields}
 Текст пользователя:
 {raw_input}
+Несколько предыдущих сообщений:
+{messages_str}
+Суммаризация диалога (если есть):
+{conversation_summary}
 """
 
 CONTRACT_MARKDOWN_SYSTEM = \

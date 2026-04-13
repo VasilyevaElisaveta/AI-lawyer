@@ -8,7 +8,7 @@ from .prompts import (
 )
 from .contract_fields import CONTRACT_FIELDS
 
-from ....utils import safe_parse_json
+from ....utils import safe_parse_json, messages_to_str
 
 
 def _clear_previous_run_results(state):
@@ -41,6 +41,9 @@ async def contract_intake_node(state, llm):
     raw_input = state.get("raw_input", "")
     if not raw_input:
         return {"error": "Нет входных данных. Передайте raw_input."}
+    messages = state.get("messages", [])
+    messages_str = messages_to_str(messages)
+    conversation_summary = state.get("conversation_summary", "")
 
     contract_type = state.get("contract_type")
     collected_fields = state.get("collected_fields", {})
@@ -56,7 +59,10 @@ async def contract_intake_node(state, llm):
         chain = prompt | llm
 
         raw = await chain.ainvoke({
-            "raw_input": raw_input
+            "raw_input": raw_input,
+            "messages_str": messages_str,
+            "conversation_summary": conversation_summary,
+
         })
 
         parsed = safe_parse_json(raw)
@@ -88,6 +94,8 @@ async def contract_intake_node(state, llm):
             "existing_fields": json.dumps(collected_fields, ensure_ascii=False),
             "target_fields": target_fields,
             "raw_input": raw_input,
+            "messages_str": messages_str,
+            "conversation_summary": conversation_summary,
         })
 
         parsed = safe_parse_json(raw)
