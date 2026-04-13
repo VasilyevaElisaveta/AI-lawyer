@@ -67,7 +67,7 @@ async def contract_answer_with_docs_node(state, llm):
     answer = await chain.ainvoke(input_d)
 
     d = {
-        "answer": answer
+        "response_to_user": answer
     }
     state.update(d)
     return state

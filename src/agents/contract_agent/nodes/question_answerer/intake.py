@@ -1,11 +1,18 @@
 from ....utils import messages_to_str, documents_to_str
 
 
+def _clear_previous_run_results(state):
+    state["document_ids"] = []
+    state["decision"] = {}
+    state["response_to_user"] = None
+
+
 async def contract_question_intake_node(state):
     """
     Используется в случаях, если агенту по договорам задали какой-либо вопрос, а не дали задание на генерацию документа.
     Собирает и валидирует необходимые поля из state.
     """
+    _clear_previous_run_results(state)
     messages = state.get("messages", [])
     messages_str = messages_to_str(messages)
     summarized_documents = state.get("summarized_documents", [])
