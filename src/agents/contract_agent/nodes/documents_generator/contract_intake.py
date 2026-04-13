@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Literal
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -10,6 +9,11 @@ from .prompts import (
 from .contract_fields import CONTRACT_FIELDS
 
 from ....utils import safe_parse_json
+
+
+def _clear_previous_run_results(state):
+    state["generated_docx_base64"] = None
+    state["response_to_user"] = None
 
 
 def _get_missing_fields(state):
@@ -62,6 +66,8 @@ async def contract_intake_node(state, llm):
             contract_type = new_type
             d["contract_type"] = new_type
             d["contract_fields"] = CONTRACT_FIELDS.get(new_type, {})
+    
+    _clear_previous_run_results(state)
 
     # если тип так и не определился — дальше смысла нет
     if not contract_type:
@@ -92,6 +98,7 @@ async def contract_intake_node(state, llm):
             d["collected_fields"] = updated
 
     d["doc_type"] = "contract"
+    d["current_node"] = "contract"
 
     state.update(d)
     return state
@@ -101,14 +108,30 @@ def validation_router(state) -> Literal["generation", "final"]:
     contract_type = state.get("contract_type")
     collected = state.get("collected_fields", {})
     if not contract_type:
+        state["is_valid"] = False
+        state["response_to_user"] = "Не удалось определить тип договора. Пожалуйста, уточните запрос."
         return "final"
     schema = state.get("contract_fields", {})
-    required_fields = [f["id"] for f in schema.get("required", [])]
-    missing_required = [f for f in required_fields if f not in collected]
+    required_fields = schema.get("required", [])
+    field_map = {f["id"]: f["title"] for f in required_fields}
+    missing_required = [
+        f["id"] for f in required_fields
+        if f["id"] not in collected
+    ]
     if missing_required:
+        missing_titles = [
+            field_map.get(field_id, field_id)
+            for field_id in missing_required
+        ]
+        response_message = (
+            "Для формирования договора необходимо указать:\n\n"
+            + "\n".join(f"- {title}" for title in missing_titles)
+        )
         state["validation_errors"] = missing_required
         state["is_valid"] = False
+        state["response_to_user"] = response_message
         return "final"
     state["validation_errors"] = []
     state["is_valid"] = True
+    state["response_to_user"] = None
     return "generation"

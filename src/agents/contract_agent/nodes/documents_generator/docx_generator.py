@@ -89,14 +89,6 @@ async def contract_docx_generation_node(state):
     contract_type = state.get("contract_type")
     markdown = _normalize_space(state.get("generated_markdown", ""))
 
-    if not contract_type or contract_type not in CONTRACT_TEMPLATES:
-        state["validation_errors"] = ["Невозможно создать DOCX: неизвестный contract_type."]
-        return state
-
-    if not markdown:
-        state["validation_errors"] = ["Невозможно создать DOCX: пустой Markdown."]
-        return state
-
     document_title = CONTRACT_TEMPLATES[contract_type]["document_title"]
     docx_bytes = _markdown_to_docx_bytes(markdown, document_title)
 

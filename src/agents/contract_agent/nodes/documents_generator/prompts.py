@@ -71,7 +71,7 @@ CONTRACT_MARKDOWN_PROMPT = \
 Заполненные поля:
 {collected_fields}
 Ошибки предыдущей проверки Markdown (если есть):
-{validation_errors}
+{markdown_validation_errors}
 Сгенерируй полный договор в Markdown.
 """
 

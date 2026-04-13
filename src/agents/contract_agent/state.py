@@ -6,6 +6,8 @@ from langgraph.graph.message import add_messages
 
 
 class ContractAgentState(TypedDict, total=False):
+    current_node: str
+
     messages: Annotated[list, add_messages]
 
     conversation_summary: str
@@ -45,17 +47,9 @@ class ContractAgentState(TypedDict, total=False):
     qa_feedback: str
     qa_attempts: int
 
-    final_document: str
-
     document_template: dict[str, Any]
     generated_markdown: str
     markdown_validation_errors: list[str]
     markdown_is_valid: bool
 
-    generated_docx_path: str
-    generated_docx_name: str
     generated_docx_base64: str
-
-    document_summary: str
-    summary_source: str
-    summary_attempts: int

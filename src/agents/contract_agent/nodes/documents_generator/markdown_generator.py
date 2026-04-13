@@ -51,17 +51,13 @@ def _collect_generation_context(state: dict) -> dict[str, Any]:
         "contract_type": state.get("contract_type"),
         "document_title": CONTRACT_TEMPLATES.get(state.get("contract_type"), {}).get("document_title", ""),
         "collected_fields": state.get("collected_fields", {}) or {},
-        "validation_errors": state.get("markdown_validation_errors", []) or [],
+        "markdown_validation_errors": state.get("markdown_validation_errors", []) or [],
         "template_outline": _build_template_outline(state),
     }
 
 
 async def contract_markdown_generation_node(state, llm):
     contract_type = state.get("contract_type")
-    if not contract_type or contract_type not in CONTRACT_TEMPLATES:
-        state["markdown_validation_errors"] = ["Неизвестный или пустой contract_type."]
-        state["markdown_is_valid"] = False
-        return state
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", CONTRACT_MARKDOWN_SYSTEM),
@@ -74,7 +70,7 @@ async def contract_markdown_generation_node(state, llm):
         "contract_type": ctx["contract_type"],
         "template_outline": json.dumps(ctx["template_outline"], ensure_ascii=False, indent=2),
         "collected_fields": json.dumps(ctx["collected_fields"], ensure_ascii=False, indent=2),
-        "validation_errors": json.dumps(ctx["validation_errors"], ensure_ascii=False, indent=2),
+        "markdown_validation_errors": json.dumps(ctx["markdown_validation_errors"], ensure_ascii=False, indent=2),
     })
 
     markdown = _strip_code_fence(raw)
