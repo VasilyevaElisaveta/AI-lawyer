@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
 
 from .prompts import (
     ROUTER_CLASSIFICATION_SYSTEM,
@@ -15,7 +16,11 @@ from ...llm_client import GigaChatClient
 from ...utils import safe_parse_json, render_template
 
 
-async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> Dict[str, Any]:
+async def classification_node(
+        state: RouterAgentState, 
+        llm: GigaChatClient, 
+        previous_node: str | None = None
+) -> Dict[str, Any]:
     """
     Узел классификации: определяет категорию запроса пользователя.
     
@@ -27,24 +32,30 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
     
     Возвращает обновлённое состояние с результатом классификации.
     """
-    user_message = state.get("raw_input", "")
+    raw_input = state.get("raw_input", "")
     
-    if not user_message:
+    if not raw_input:
         return {
             "error_message": "Не получено сообщение пользователя",
             "reply": "Ошибка: пустой запрос",
             "routed_to": "none",
         }
     
-    # Подготавливаем промпт
-    prompt = render_template(ROUTER_CLASSIFICATION_PROMPT, {"user_message": user_message})
+    if previous_node is not None:
+        return {
+            "routed_to": previous_node,
+            "reply": "",
+        }
     
-    # Вызываем LLM для классификации
+    prompt = ChatPromptTemplate.from_messages(
+        ("system", ROUTER_CLASSIFICATION_SYSTEM),
+        ("human", ROUTER_CLASSIFICATION_PROMPT)
+    )
+    
     try:
-        response = await llm.ainvoke([
-            SystemMessage(content=ROUTER_CLASSIFICATION_SYSTEM),
-            HumanMessage(content=prompt),
-        ])
+        response = await llm.ainvoke({
+            "raw_input": raw_input
+        })
         classification_result = safe_parse_json(response)
     except Exception as e:
         return {
@@ -53,7 +64,6 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
             "routed_to": "none",
         }
     
-    # Проверяем результат классификации
     if not classification_result or "category" not in classification_result:
         return {
             "error_message": "LLM вернул некорректный результат классификации",
@@ -65,7 +75,7 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
     confidence = classification_result.get("confidence", 0.0)
     
     # Определяем, реализован ли обработчик для этой категории
-    implemented_categories = {"contract", "simple_question"}
+    implemented_categories = {"contract"}
     is_implemented = category in implemented_categories
     
     # Подготавливаем результат
@@ -82,7 +92,7 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
             "contract": "contract_agent",
             "simple_question": "simple_question_agent",
         }.get(category, "none")
-        result["reply"] = ""  # Пусто, будет заполнено в маршрутизаторе
+        result["reply"] = ""
     else:
         # Категория не реализована
         result["routed_to"] = "none"

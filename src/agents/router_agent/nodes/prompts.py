@@ -10,7 +10,7 @@ ROUTER_CLASSIFICATION_SYSTEM = """
 
 ROUTER_CLASSIFICATION_PROMPT = """
     Классифицируй следующий запрос пользователя:
-    {user_message}
+    {raw_input}
     Верни JSON объект со СЛЕДУЮЩЕЙ СТРУКТУРОЙ (все обязательные поля):
     {{
       "category": "contract" | "lawsuit" | "pretrial_claim" | "simple_question",

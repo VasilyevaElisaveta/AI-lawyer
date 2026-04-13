@@ -44,13 +44,13 @@ class RouterAgent:
         # )
         self.graph = create_graph(self.llm).compile(checkpointer=self.memory)
     
-    def _build_input_state(self, user_message: str) -> dict:
+    def _build_input_state(self, raw_input: str) -> dict:
         return {
-            "raw_input": user_message
+            "raw_input": raw_input
         }
 
-    async def process_user_message(self, user_message: str, thread_id: str) -> dict:
-        input_state = self._build_input_state(user_message)
+    async def process_user_message(self, raw_input: str, thread_id: str) -> dict:
+        input_state = self._build_input_state(raw_input)
         result = await self.graph.ainvoke(
             input_state,
             config={
