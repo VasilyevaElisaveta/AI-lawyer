@@ -8,31 +8,50 @@ from src.agents.llm_client import GigaChatClient
 async def summarize_messages(
     messages,
     llm: GigaChatClient,
+    previous_summary: str | None = None,
 ) -> str:
 
-    # Преобразуем сообщения в строку для промпта
-    dialog_text = "\n".join([f"{msg.type}: {msg.content}" for msg in messages])
-
-    prompt = HumanMessage(
-        content=f"""
-Суммаризируй диалог.
-
-Сохрани:
-
-- факты
-- даты
-- суммы
-- обязательства
-- юридические детали
-
-Диалог:
-
-{dialog_text}
-"""
+    dialog_text = "\n".join(
+        [f"{msg.type}: {msg.content}" for msg in messages]
     )
 
-    summary = await llm.ainvoke(
-        [prompt]
-    )
+    content = f"""
+    Ты обновляешь долговременную память диалога.
+    Верни результат строго в формате:
+
+    ФАКТЫ:
+    ...
+
+    РЕШЕНИЯ:
+    ...
+
+    ДОГОВОРЁННОСТИ:
+    ...
+
+    ПАРАМЕТРЫ:
+    ...
+
+    КОНТЕКСТ:
+    ...
+
+    ---
+
+    СТАРАЯ ПАМЯТЬ:
+    {previous_summary}
+
+    НОВЫЕ СООБЩЕНИЯ:
+    {dialog_text}
+
+    ---
+
+    Правила:
+    - не теряй важные факты
+    - не дублируй
+    - обновляй значения при изменениях
+    - убирай устаревшее
+    """
+
+    prompt = HumanMessage(content=content)
+    summary = await llm.ainvoke([prompt])
 
     return summary
