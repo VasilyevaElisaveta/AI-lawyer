@@ -1,6 +1,6 @@
 from .base import BaseGraphAgent
 
-from ....agents.router_agent import RouterAgent
+from .....agents.router_agent import RouterAgent
 
 
 class RouterGraphAgent(BaseGraphAgent):

@@ -2,7 +2,7 @@ from typing import Any
 
 from .base import BaseGraphAgent
 
-from ....agents.contract_agent import ContractAgent
+from .....agents.contract_agent import ContractAgent
 
 
 class ContractGraphAgent(BaseGraphAgent):
