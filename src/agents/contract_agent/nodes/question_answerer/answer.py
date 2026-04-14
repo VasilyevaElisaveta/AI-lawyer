@@ -1,7 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 
 from .promtps import (
-    make_decision_dict, make_answer_dict, 
+    make_decision_dict, make_answer_dict,
     DECISION_PROMPT, DECISION_SYSTEM, ANSWER_PROMPT, ANSWER_SYSTEM
 )
 
@@ -38,7 +38,8 @@ async def contract_answer_decision_node(state, llm):
 
 
 def contract_document_answer_decision_router(state):
-    if state["decision"].get("need_documents", False):
+    decision = state.get("decision", {})
+    if isinstance(decision, dict) and decision.get("need_documents", False):
         return "answer_with_docs"
     else:
         return "question_answer"
@@ -46,9 +47,12 @@ def contract_document_answer_decision_router(state):
 
 async def contract_answer_with_docs_node(state, llm):
     raw_input = state.get("raw_input", "")
-    decision = state.get("decision", "")
+    decision = state.get("decision", {})
     docs = state.get("generated_documents", [])
-    document_ids = decision.get("document_ids", [-1])
+    if isinstance(decision, dict):
+        document_ids = decision.get("document_ids", [-1])
+    else:
+        document_ids = [-1]
 
     selected_docs = [
         docs[i] for i in document_ids

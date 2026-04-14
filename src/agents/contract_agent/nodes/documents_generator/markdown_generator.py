@@ -76,8 +76,9 @@ async def contract_markdown_generation_node(state, llm):
     markdown = _strip_code_fence(raw)
 
     state["generated_markdown"] = markdown
-    state["markdown_is_valid"] = False
     state["markdown_validation_errors"] = state.get("markdown_validation_errors", [])
     state.setdefault("generated_documents", [])
     state["generated_documents"] = state["generated_documents"] + [markdown]
+    state["markdown_generation_attempts"] = state.get("markdown_generation_attempts", 0) + 1
+    
     return state

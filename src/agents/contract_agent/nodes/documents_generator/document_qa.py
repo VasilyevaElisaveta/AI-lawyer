@@ -91,4 +91,10 @@ def contract_markdown_validation_node(state):
 
 
 def contract_markdown_validation_router(state) -> Literal["markdown_generation", "docx_generation"]:
+    # Prevent infinite loops - limit to 3 attempts
+    attempts = state.get("markdown_generation_attempts", 0)
+    if attempts >= 3:
+        # Force generation even if invalid after 3 attempts
+        return "docx_generation"
+    
     return "docx_generation" if state.get("markdown_is_valid") else "markdown_generation"

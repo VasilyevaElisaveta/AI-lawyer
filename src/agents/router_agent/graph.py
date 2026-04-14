@@ -1,4 +1,3 @@
-from functools import partial
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -13,16 +12,20 @@ from ..llm_client import GigaChatClient
 def create_graph(llm: GigaChatClient) -> StateGraph:
     """
     Создаёт граф маршрутизирующего агента.
-    
+
     Граф состоит из одного узла:
     1. classification - классификация запроса пользователя в одну из 4 категорий
-    
+
     После классификации граф завершает работу, передавая результат классификации.
     """
+
+    async def classification_node_wrapper(state: RouterAgentState) -> dict[str, Any]:
+        return await classification_node(state, llm)
+
     graph = StateGraph(RouterAgentState)
 
     # Добавляем узел классификации
-    graph.add_node("classification", partial(classification_node, llm=llm))
+    graph.add_node("classification", classification_node_wrapper)
 
     # Определяем рёбра
     graph.add_edge(START, "classification")

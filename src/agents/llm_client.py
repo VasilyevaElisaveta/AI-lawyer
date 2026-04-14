@@ -11,7 +11,7 @@ SBER_AUTH = os.getenv("SBER_AUTH")
 class GigaChatClient:
     def __init__(
         self,
-        model: str = "GigaChat-2-Max",
+        model: str = "GigaChat",
         temperature: float = 0.0,
     ) -> None:
         credentials = SBER_AUTH or os.getenv("SBER_AUTH")

@@ -14,6 +14,7 @@ from ....utils import safe_parse_json, messages_to_str
 def _clear_previous_run_results(state):
     state["generated_docx_base64"] = None
     state["response_to_user"] = None
+    state["markdown_generation_attempts"] = 0
 
 
 def _get_missing_fields(state):

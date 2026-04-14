@@ -17,9 +17,9 @@ async def contract_classification_node(state, llm):
 
     chain = prompt | llm
 
-    desicion = await chain.ainvoke(input_d)
+    decision = await chain.ainvoke(input_d)
     d = {
-        "contract_class": desicion,
+        "contract_class": decision,
     }
     state.update(d)
     return dict(state)

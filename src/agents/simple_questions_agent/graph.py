@@ -1,4 +1,3 @@
-from functools import partial
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
@@ -21,10 +20,17 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     
     После генерации ответа граф завершает работу.
     """
+
+    async def memory_node_wrapper(state: SimpleQuestionAgentState) -> dict[str, Any]:
+        return await memory_node(state, llm)
+
+    async def answer_node_wrapper(state: SimpleQuestionAgentState) -> dict[str, Any]:
+        return await answer_node(state, llm)
+
     graph = StateGraph(SimpleQuestionAgentState)
 
-    graph.add_node("memory", partial(memory_node, llm=llm))
-    graph.add_node("answer", partial(answer_node, llm=llm))
+    graph.add_node("memory", memory_node_wrapper)
+    graph.add_node("answer", answer_node_wrapper)
 
     # Определяем рёбра
     graph.add_edge(START, "memory")

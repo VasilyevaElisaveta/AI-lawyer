@@ -51,7 +51,7 @@ def safe_parse_json(text: str) -> dict[str, Any]:
         return {}
     
 
-def messages_to_str(messages: List[Dict]) -> str:
+def messages_to_str(messages) -> str:
     role_map = {
         "human": "User",
         "ai": "Assistant",
@@ -61,8 +61,19 @@ def messages_to_str(messages: List[Dict]) -> str:
     formatted_messages = []
 
     for msg in messages:
-        role = role_map.get(msg.get("type", ""), msg.get("type", "unknown"))
-        content = msg.get("content", "").strip()
+        # Handle both dict and BaseMessage objects
+        if hasattr(msg, 'type') and hasattr(msg, 'content'):
+            # BaseMessage object
+            role = role_map.get(msg.type, msg.type)
+            content = msg.content.strip()
+        elif isinstance(msg, dict):
+            # Dict object
+            role = role_map.get(msg.get("type", ""), msg.get("type", "unknown"))
+            content = msg.get("content", "").strip()
+        else:
+            # Unknown type
+            role = "unknown"
+            content = str(msg).strip()
 
         if not content:
             continue
