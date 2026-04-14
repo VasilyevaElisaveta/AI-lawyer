@@ -15,6 +15,10 @@ from ..state import RouterAgentState
 from ...llm_client import GigaChatClient
 from ...utils import safe_parse_json, render_template
 
+from ....utils import LoggerFactory
+
+logger = LoggerFactory.get_logger("RouterAgentClassificationNode")
+
 
 async def classification_node(
         state: RouterAgentState, 
@@ -32,6 +36,7 @@ async def classification_node(
     
     Возвращает обновлённое состояние с результатом классификации.
     """
+    logger.info("Start...")
     raw_input = state.get("raw_input", "")
     
     if not raw_input:
@@ -101,5 +106,9 @@ async def classification_node(
             CATEGORY_NOT_IMPLEMENTED,
             {"category": category}
         )
-    
+    logger.debug(
+        f"Got result\n" \
+        f"routed to: {result["routed_to"]}"
+    )
+    logger.info("Finish")
     return result

@@ -6,6 +6,11 @@ from .prompts import CONTRACT_SUMMARY_SYSTEM, CONTRACT_SUMMARY_PROMPT
 
 from ....utils import _normalize_space
 
+from .....utils import LoggerFactory
+
+
+logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorSummarizatorNode")
+
 
 def _strip_code_fence(text: str) -> str:
     t = text.strip()
@@ -15,6 +20,7 @@ def _strip_code_fence(text: str) -> str:
 
 
 async def contract_document_summary_node(state, llm):
+    logger.info("Start...")
     contract_type = state.get("contract_type")
     markdown = _normalize_space(state.get("generated_markdown", ""))
 
@@ -33,4 +39,6 @@ async def contract_document_summary_node(state, llm):
 
     state.setdefault("summarized_documents", [])
     state["summarized_documents"] = state["summarized_documents"] + [summary]
+    logger.debug(f"Got result: summraized document: {summary}")
+    logger.info("Finish")
     return state

@@ -5,6 +5,11 @@ from .documents_templates import CONTRACT_TEMPLATES
 
 from ....utils import _normalize_space
 
+from .....utils import LoggerFactory
+
+
+logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorQANode")
+
 
 def _has_placeholder_tokens(markdown: str) -> bool:
     patterns = [
@@ -30,6 +35,7 @@ def _find_heading_block(markdown: str, label: str) -> tuple[int, int] | None:
 
 
 def contract_markdown_validation_node(state):
+    logger.info("Start...")
     contract_type = state.get("contract_type")
     markdown = _normalize_space(state.get("generated_markdown", ""))
     template = CONTRACT_TEMPLATES.get(contract_type)
@@ -87,14 +93,28 @@ def contract_markdown_validation_node(state):
     state["markdown_is_valid"] = len(errors) == 0
     state["qa_passed"] = len(errors) == 0
     state["qa_feedback"] = "\n".join(errors)
+    logger.debug(
+        f"Got result\n" \
+        f"markdown errors: {state["markdown_validation_errors"]}\n" \
+        f"markdown is valid: {state["markdown_is_valid"]}\n" \
+        f"qa_passed: {state["qa_passed"]}\n" \
+        f"qa_feedback: {state["qa_feedback"]}"
+    )
+    logger.info("Finish")
     return state
 
 
 def contract_markdown_validation_router(state) -> Literal["markdown_generation", "docx_generation"]:
+    logger.info("Start router...")
     # Prevent infinite loops - limit to 3 attempts
     attempts = state.get("markdown_generation_attempts", 0)
     if attempts >= 3:
         # Force generation even if invalid after 3 attempts
+        logger.warning("Markdown generation limit exceeded")
+        logger.debug("Selected node: docx_generation")
+        logger.info("Finish router")
         return "docx_generation"
-    
-    return "docx_generation" if state.get("markdown_is_valid") else "markdown_generation"
+    decision_node = "docx_generation" if state.get("markdown_is_valid") else "markdown_generation"
+    logger.debug(f"Selected node: {decision_node}")
+    logger.info("Finish router")
+    return decision_node

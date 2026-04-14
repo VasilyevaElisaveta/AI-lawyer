@@ -8,6 +8,10 @@ from ..prompts import ANSWER_SYSTEM, ANSWER_PROMPT
 from ...llm_client import GigaChatClient
 from ...utils import render_template
 
+from ....utils import LoggerFactory
+
+logger = LoggerFactory.get_logger("SimpleQuestionsAgentAnswerNode")
+
 
 async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> Dict[str, Any]:
     """
@@ -22,6 +26,7 @@ async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> D
     Returns:
         Обновлённое состояние с ответом
     """
+    logger.info("Start")
     user_question = state.get("raw_input", "")
     
     if not user_question:
@@ -44,7 +49,8 @@ async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> D
     messages = state.get("messages", []) or []
     messages.append(AIMessage(content=reply))
     state["messages"] = messages
-
+    logger.debug(f"Got result reply: {reply}")
+    logger.info("Finish")
     return {
         "reply": reply,
         "messages": messages,

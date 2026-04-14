@@ -10,11 +10,17 @@ from .contract_fields import CONTRACT_FIELDS
 
 from ....utils import safe_parse_json, messages_to_str
 
+from .....utils import LoggerFactory
+
+
+logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorIntakeNode")
+
 
 def _clear_previous_run_results(state):
     state["generated_docx_base64"] = None
     state["response_to_user"] = None
     state["markdown_generation_attempts"] = 0
+    logger.info("Previous run results cleared")
 
 
 def _get_missing_fields(state):
@@ -39,6 +45,7 @@ def _update_collected_fields(state, new_data):
 
 
 async def contract_generator_intake_node(state, llm):
+    logger.info("Start...")
     raw_input = state.get("raw_input", "")
     if not raw_input:
         return {"error": "Нет входных данных. Передайте raw_input."}
@@ -79,6 +86,7 @@ async def contract_generator_intake_node(state, llm):
     # если тип так и не определился — дальше смысла нет
     if not contract_type:
         state.update(d)
+        logger.warning("Unable to identify contract type")
         return state
 
     target_fields = _get_missing_fields(state)
@@ -110,10 +118,13 @@ async def contract_generator_intake_node(state, llm):
     d["current_node"] = "contract"
 
     state.update(d)
+    logger.debug(f"Got result collected_fields: {d.get("collected_fields", "")}")
+    logger.info("Finish")
     return state
 
 
 def contract_generator_validation_router(state) -> Literal["generation", "final"]:
+    logger.info("Start router...")
     contract_type = state.get("contract_type")
     collected = state.get("collected_fields", {})
     if not contract_type:
@@ -139,8 +150,12 @@ def contract_generator_validation_router(state) -> Literal["generation", "final"
         state["validation_errors"] = missing_required
         state["is_valid"] = False
         state["response_to_user"] = response_message
+        logger.debug("Selected node: final")
+        logger.info("Finish router")
         return "final"
     state["validation_errors"] = []
     state["is_valid"] = True
     state["response_to_user"] = None
+    logger.debug("Selected node: generation")
+    logger.info("Finish router")
     return "generation"

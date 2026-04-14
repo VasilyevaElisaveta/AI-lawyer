@@ -4,16 +4,22 @@ from langchain_core.messages import AIMessage
 
 from ...state import ContractAgentState
 
+from .....utils import LoggerFactory
+
+
+logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorFinalNode")
+
 
 def clear_results_before_end(state):
     state["collected_fields"] = {}
     state["contract_type"] = None
     state["doc_type"] = None
     state["current_node"] = None
+    logger.info("Clear some results before end")
 
 
 async def contract_generator_final_node(state: ContractAgentState) -> Dict[str, Any]:
-    """Финальная нода: возврат документа или ответа пользователю."""
+    logger.info("Start...")
     if state.get("response_to_user"):
         final_text = state["response_to_user"]
     elif state.get("generated_docx_base64"):
@@ -28,5 +34,6 @@ async def contract_generator_final_node(state: ContractAgentState) -> Dict[str, 
     if final_text:
         messages.append(AIMessage(content=final_text))
     state["messages"] = messages
-
+    logger.debug(f"Got result message: {final_text}")
+    logger.info("Finish")
     return dict(state)

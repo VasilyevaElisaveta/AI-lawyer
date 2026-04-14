@@ -1,10 +1,15 @@
 from ....utils import messages_to_str, documents_to_str
 
+from .....utils import LoggerFactory
+
+logger = LoggerFactory.get_logger("ContractAgentQuestionAnswererIntakeNode")
+
 
 def _clear_previous_run_results(state):
     state["document_ids"] = []
     state["decision"] = {}
     state["response_to_user"] = None
+    logger.info("Previous run results cleared")
 
 
 async def contract_question_intake_node(state):
@@ -12,6 +17,7 @@ async def contract_question_intake_node(state):
     Используется в случаях, если агенту по договорам задали какой-либо вопрос, а не дали задание на генерацию документа.
     Собирает и валидирует необходимые поля из state.
     """
+    logger.info("Start...")
     _clear_previous_run_results(state)
     messages = state.get("messages", [])
     messages_str = messages_to_str(messages)
@@ -22,4 +28,5 @@ async def contract_question_intake_node(state):
         "summarized_documents_str": summarized_documents_str
     }
     state.update(d)
+    logger.info("Finish")
     return dict(state)

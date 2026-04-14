@@ -10,6 +10,11 @@ from .documents_templates import CONTRACT_TEMPLATES
 
 from ....utils import _normalize_space
 
+from .....utils import LoggerFactory
+
+
+logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorDocxNode")
+
 
 def _add_inline_markdown(paragraph, text: str):
     """
@@ -30,7 +35,6 @@ def _add_inline_markdown(paragraph, text: str):
             run.italic = True
         else:
             paragraph.add_run(part)
-
 
 
 def _markdown_to_docx_bytes(markdown: str, document_title: str) -> bytes:
@@ -86,6 +90,7 @@ def _markdown_to_docx_bytes(markdown: str, document_title: str) -> bytes:
 
 
 async def contract_docx_generation_node(state):
+    logger.info("Start...")
     contract_type = state.get("contract_type")
     markdown = _normalize_space(state.get("generated_markdown", ""))
 
@@ -93,4 +98,6 @@ async def contract_docx_generation_node(state):
     docx_bytes = _markdown_to_docx_bytes(markdown, document_title)
 
     state["generated_docx_base64"] = base64.b64encode(docx_bytes).decode("utf-8")
+    logger.debug(f"Got result docx document [:100]: {state["generated_docx_base64"][:max(100, len(state["generated_docx_base64"]))]}")
+    logger.info("Finish")
     return state

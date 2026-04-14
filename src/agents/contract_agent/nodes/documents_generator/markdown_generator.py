@@ -10,6 +10,11 @@ from .prompts import (
 )
 from .documents_templates import CONTRACT_TEMPLATES
 
+from .....utils import LoggerFactory
+
+
+logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorMarkdownNode")
+
 
 def _strip_code_fence(text: str) -> str:
     t = text.strip()
@@ -57,7 +62,7 @@ def _collect_generation_context(state: dict) -> dict[str, Any]:
 
 
 async def contract_markdown_generation_node(state, llm):
-    contract_type = state.get("contract_type")
+    logger.info("Start...")
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", CONTRACT_MARKDOWN_SYSTEM),
@@ -76,9 +81,14 @@ async def contract_markdown_generation_node(state, llm):
     markdown = _strip_code_fence(raw)
 
     state["generated_markdown"] = markdown
-    state["markdown_validation_errors"] = state.get("markdown_validation_errors", [])
     state.setdefault("generated_documents", [])
     state["generated_documents"] = state["generated_documents"] + [markdown]
     state["markdown_generation_attempts"] = state.get("markdown_generation_attempts", 0) + 1
-    
+    logger.debug(
+        f"Got result:\n" \
+        f"generated markdown: {markdown}\n" \
+        f"markdown errors: {state["markdown_validation_errors"]}\n"
+        f"markdown generation attempt: {state["markdown_generation_attempts"]}"
+    )
+    logger.info("Finish")
     return state
