@@ -37,7 +37,15 @@ async def memory_node(
         return dict(state)
 
     old_messages = messages[:-KEEP_LAST_MESSAGES]
-    summary = await summarize_messages(old_messages, llm)
+
+    previous_summary = state.get("conversation_summary")
+
+    summary = await summarize_messages(
+        old_messages,
+        llm,
+        previous_summary,
+    )
+
     state["conversation_summary"] = summary
 
     new_messages = messages[-KEEP_LAST_MESSAGES:]
