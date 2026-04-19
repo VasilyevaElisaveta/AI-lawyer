@@ -1,4 +1,5 @@
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 from .prompts import (
     make_classification_dict,
@@ -11,7 +12,11 @@ from .....utils import LoggerFactory
 logger = LoggerFactory.get_logger("ContractAgentClassificationNode")
 
 
-async def contract_classification_node(state, llm):
+async def contract_classification_node(
+    state, 
+    llm, 
+    config: RunnableConfig | None = None
+):
     logger.info("Start...")
     raw_input = state.get("raw_input", "")
 
@@ -23,7 +28,7 @@ async def contract_classification_node(state, llm):
 
     chain = prompt | llm
 
-    decision = await chain.ainvoke(input_d)
+    decision = await chain.ainvoke(input_d, config=config)
     d = {
         "contract_class": decision,
     }

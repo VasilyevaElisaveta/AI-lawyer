@@ -1,6 +1,7 @@
 from typing import Any, Dict
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from ..state import SimpleQuestionAgentState
 from ..prompts import ANSWER_SYSTEM, ANSWER_PROMPT
@@ -13,7 +14,11 @@ from ....utils import LoggerFactory
 logger = LoggerFactory.get_logger("SimpleQuestionsAgentAnswerNode")
 
 
-async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> Dict[str, Any]:
+async def answer_node(
+    state: SimpleQuestionAgentState, 
+    llm: GigaChatClient,
+    config: RunnableConfig | None = None
+) -> Dict[str, Any]:
     """
     Узел ответа на простой вопрос.
     
@@ -42,7 +47,9 @@ async def answer_node(state: SimpleQuestionAgentState, llm: GigaChatClient) -> D
         reply = await llm.ainvoke([
             SystemMessage(content=ANSWER_SYSTEM),
             HumanMessage(content=prompt),
-        ])
+        ],
+        config=config
+        )
     except Exception as e:
         reply = f"Ошибка при обработке вашего вопроса: {str(e)}"
 

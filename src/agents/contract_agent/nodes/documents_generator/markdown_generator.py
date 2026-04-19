@@ -3,6 +3,7 @@ import re
 from typing import Any
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 from .prompts import (
     CONTRACT_MARKDOWN_PROMPT,
@@ -61,7 +62,7 @@ def _collect_generation_context(state: dict) -> dict[str, Any]:
     }
 
 
-async def contract_markdown_generation_node(state, llm):
+async def contract_markdown_generation_node(state, llm, config: RunnableConfig | None = None):
     logger.info("Start...")
 
     prompt = ChatPromptTemplate.from_messages([
@@ -76,7 +77,9 @@ async def contract_markdown_generation_node(state, llm):
         "template_outline": json.dumps(ctx["template_outline"], ensure_ascii=False, indent=2),
         "collected_fields": json.dumps(ctx["collected_fields"], ensure_ascii=False, indent=2),
         "markdown_validation_errors": json.dumps(ctx["markdown_validation_errors"], ensure_ascii=False, indent=2),
-    })
+    },
+    config=config
+    )
 
     markdown = _strip_code_fence(raw)
 

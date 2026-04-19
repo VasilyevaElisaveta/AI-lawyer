@@ -2,6 +2,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.runnables import RunnableConfig
 
 from .nodes import answer_node
 from .state import SimpleQuestionAgentState
@@ -21,11 +22,17 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     После генерации ответа граф завершает работу.
     """
 
-    async def memory_node_wrapper(state: SimpleQuestionAgentState) -> dict[str, Any]:
-        return await memory_node(state, llm)
+    async def memory_node_wrapper(
+        state: SimpleQuestionAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await memory_node(state, llm, config=config)
 
-    async def answer_node_wrapper(state: SimpleQuestionAgentState) -> dict[str, Any]:
-        return await answer_node(state, llm)
+    async def answer_node_wrapper(
+        state: SimpleQuestionAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await answer_node(state, llm, config=config)
 
     graph = StateGraph(SimpleQuestionAgentState)
 
@@ -63,6 +70,7 @@ class SimpleQuestionAgent:
         result = await self.graph.ainvoke(
             input_state,
             config={
+                "run_name": "SimpleQuestionAgent",
                 "configurable": {
                     "thread_id": thread_id
                 }

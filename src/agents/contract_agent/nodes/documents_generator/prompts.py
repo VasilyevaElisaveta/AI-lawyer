@@ -8,7 +8,7 @@ CLASSIFY_SYSTEM = \
 - services
 Верни строго JSON:
 {
-  "contract_type": "nda"
+  "contract_type": "nda/rent/service"
 }
 """
 
@@ -82,7 +82,6 @@ CONTRACT_MARKDOWN_PROMPT = \
 {markdown_validation_errors}
 Сгенерируй полный договор в Markdown.
 """
-
 
 CONTRACT_SUMMARY_SYSTEM = \
 """

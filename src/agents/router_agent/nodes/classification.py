@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
-from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 from .prompts import (
     ROUTER_CLASSIFICATION_SYSTEM,
@@ -23,7 +23,8 @@ logger = LoggerFactory.get_logger("RouterAgentClassificationNode")
 async def classification_node(
         state: RouterAgentState, 
         llm: GigaChatClient, 
-        previous_node: str | None = None
+        previous_node: str | None = None,
+        config: RunnableConfig | None = None
 ) -> Dict[str, Any]:
     """
     Узел классификации: определяет категорию запроса пользователя.
@@ -60,7 +61,9 @@ async def classification_node(
     try:
         response = await llm.ainvoke({
             "raw_input": raw_input
-        })
+        },
+        config=config
+        )
         classification_result = safe_parse_json(response)
     except Exception as e:
         return {

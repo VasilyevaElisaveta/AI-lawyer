@@ -1,5 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableConfig
 
 from .promtps import (
     make_decision_dict, make_answer_dict,
@@ -14,7 +15,7 @@ from .....utils import LoggerFactory
 logger = LoggerFactory.get_logger("ContractAgentQuestionAnswererAnswerNode")
 
 
-async def contract_answer_decision_node(state, llm):
+async def contract_answer_decision_node(state, llm, config: RunnableConfig | None = None):
     logger.info("Start...")
     raw_input = state.get("raw_input", "")
     if not raw_input:
@@ -34,7 +35,7 @@ async def contract_answer_decision_node(state, llm):
 
     chain = prompt | llm
 
-    raw = await chain.ainvoke(input_d)
+    raw = await chain.ainvoke(input_d, config=config)
     decision = safe_parse_json(raw)
 
     d = {
@@ -55,7 +56,7 @@ def contract_document_answer_decision_router(state):
     return decision_node
 
 
-async def contract_answer_with_docs_node(state, llm):
+async def contract_answer_with_docs_node(state, llm, config: RunnableConfig | None = None):
     logger.info("Start...")
     raw_input = state.get("raw_input", "")
     decision = state.get("decision", {})
@@ -79,7 +80,7 @@ async def contract_answer_with_docs_node(state, llm):
 
     chain = prompt | llm
 
-    answer = await chain.ainvoke(input_d)
+    answer = await chain.ainvoke(input_d, config=config)
     messages = state.get("messages", []) or []
     if answer:
         messages.append(AIMessage(content=answer))

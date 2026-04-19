@@ -2,6 +2,8 @@ import os
 
 from langchain_gigachat import GigaChat
 from langchain_core.messages import BaseMessage
+from langchain_core.runnables import RunnableConfig
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -29,6 +31,10 @@ class GigaChatClient:
             timeout=120,
         )
 
-    async def ainvoke(self, messages: list[BaseMessage]) -> str:
-        response = await self.client.ainvoke(messages)
+    async def ainvoke(
+        self, 
+        messages: list[BaseMessage],
+        config: RunnableConfig | None = None
+    ) -> str:
+        response = await self.client.ainvoke(messages, config=config)
         return getattr(response, "content", str(response))

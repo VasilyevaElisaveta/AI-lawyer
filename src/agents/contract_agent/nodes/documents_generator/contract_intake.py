@@ -2,6 +2,7 @@ import json
 from typing import Literal
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 from .prompts import (
     CLASSIFY_SYSTEM, CLASSIFY_PROMPT, EXTRACT_SYSTEM, EXTRACT_PROMPT
@@ -44,7 +45,7 @@ def _update_collected_fields(state, new_data):
     return collected
 
 
-async def contract_generator_intake_node(state, llm):
+async def contract_generator_intake_node(state, llm, config: RunnableConfig | None = None):
     logger.info("Start...")
     raw_input = state.get("raw_input", "")
     if not raw_input:
@@ -70,8 +71,9 @@ async def contract_generator_intake_node(state, llm):
             "raw_input": raw_input,
             "messages_str": messages_str,
             "conversation_summary": conversation_summary,
-
-        })
+        },
+        config=config
+        )
 
         parsed = safe_parse_json(raw)
         new_type = parsed.get("contract_type")
@@ -105,7 +107,9 @@ async def contract_generator_intake_node(state, llm):
             "raw_input": raw_input,
             "messages_str": messages_str,
             "conversation_summary": conversation_summary,
-        })
+        },
+        config=config
+        )
 
         parsed = safe_parse_json(raw)
         new_fields = parsed.get("fields", {})

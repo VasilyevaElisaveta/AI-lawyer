@@ -2,6 +2,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.runnables import RunnableConfig
 
 from .nodes import classification_node
 from .state import RouterAgentState
@@ -19,8 +20,11 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     После классификации граф завершает работу, передавая результат классификации.
     """
 
-    async def classification_node_wrapper(state: RouterAgentState) -> dict[str, Any]:
-        return await classification_node(state, llm)
+    async def classification_node_wrapper(
+        state: RouterAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await classification_node(state, llm, config=config)
 
     graph = StateGraph(RouterAgentState)
 
@@ -57,6 +61,7 @@ class RouterAgent:
         result = await self.graph.ainvoke(
             input_state,
             config={
+                "run_name": "RouterAgent",
                 "configurable": {
                     "thread_id": thread_id
                 }

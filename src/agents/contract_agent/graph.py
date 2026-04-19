@@ -2,6 +2,7 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.runnables import RunnableConfig
 
 from .nodes import *
 from .state import ContractAgentState
@@ -15,26 +16,47 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     """Создаёт граф агента."""
 
     # Создаём wrapper функции для узлов с LLM
-    async def summarization_node(state: ContractAgentState) -> dict[str, Any]:
-        return await memory_node(state, llm)
+    async def summarization_node(
+        state: ContractAgentState,
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await memory_node(state, llm, config=config)
 
-    async def classification_node_wrapper(state: ContractAgentState) -> dict[str, Any]:
-        return await contract_classification_node(state, llm)
+    async def classification_node_wrapper(
+        state: ContractAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await contract_classification_node(state, llm, config=config)
 
-    async def generator_intake_node_wrapper(state: ContractAgentState) -> dict[str, Any]:
-        return await contract_generator_intake_node(state, llm)
+    async def generator_intake_node_wrapper(
+        state: ContractAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await contract_generator_intake_node(state, llm, config=config)
 
-    async def markdown_generation_node_wrapper(state: ContractAgentState) -> dict[str, Any]:
-        return await contract_markdown_generation_node(state, llm)
+    async def markdown_generation_node_wrapper(
+        state: ContractAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await contract_markdown_generation_node(state, llm, config=config)
 
-    async def document_summary_node_wrapper(state: ContractAgentState) -> dict[str, Any]:
-        return await contract_document_summary_node(state, llm)
+    async def document_summary_node_wrapper(
+        state: ContractAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await contract_document_summary_node(state, llm, config=config)
 
-    async def answer_decision_node_wrapper(state: ContractAgentState) -> dict[str, Any]:
-        return await contract_answer_decision_node(state, llm)
+    async def answer_decision_node_wrapper(
+        state: ContractAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await contract_answer_decision_node(state, llm, config=config)
 
-    async def answer_with_docs_node_wrapper(state: ContractAgentState) -> dict[str, Any]:
-        return await contract_answer_with_docs_node(state, llm)
+    async def answer_with_docs_node_wrapper(
+        state: ContractAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await contract_answer_with_docs_node(state, llm, config=config)
 
     async def question_answer_node_wrapper(state: ContractAgentState) -> dict[str, Any]:
         return await contract_question_answer_node(state)
@@ -96,6 +118,7 @@ class ContractAgent:
         result = await self.graph.ainvoke(
             input_state,
             config={
+                "run_name": "ContractAgent",
                 "configurable": {
                     "thread_id": thread_id
                 }
