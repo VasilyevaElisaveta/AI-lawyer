@@ -3,24 +3,23 @@ from typing import Any, Dict
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
-from ..state import SimpleQuestionAgentState
+from ..state import GeneralQuestionAgentState
 from ..prompts import ANSWER_SYSTEM, ANSWER_PROMPT
 
-from ...llm_client import GigaChatClient
 from ...utils import render_template
 
 from ....utils import LoggerFactory
 
-logger = LoggerFactory.get_logger("SimpleQuestionsAgentAnswerNode")
+logger = LoggerFactory.get_logger("GeneralQuestionsAgentAnswerNode")
 
 
 async def answer_node(
-    state: SimpleQuestionAgentState, 
-    llm: GigaChatClient,
+    state: GeneralQuestionAgentState, 
+    llm,
     config: RunnableConfig | None = None
 ) -> Dict[str, Any]:
     """
-    Узел ответа на простой вопрос.
+    Узел ответа на общий вопрос.
     
     Использует LLM для генерации ответа на вопрос пользователя.
     
@@ -44,12 +43,13 @@ async def answer_node(
     
     # Вызываем LLM для генерации ответа
     try:
-        reply = await llm.ainvoke([
+        response = await llm.ainvoke([
             SystemMessage(content=ANSWER_SYSTEM),
             HumanMessage(content=prompt),
         ],
         config=config
         )
+        reply = response.content
     except Exception as e:
         reply = f"Ошибка при обработке вашего вопроса: {str(e)}"
 

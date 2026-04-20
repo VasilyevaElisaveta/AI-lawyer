@@ -72,7 +72,7 @@ async def contract_markdown_generation_node(state, llm, config: RunnableConfig |
     chain = prompt | llm
 
     ctx = _collect_generation_context(state)
-    raw = await chain.ainvoke({
+    response = await chain.ainvoke({
         "contract_type": ctx["contract_type"],
         "template_outline": json.dumps(ctx["template_outline"], ensure_ascii=False, indent=2),
         "collected_fields": json.dumps(ctx["collected_fields"], ensure_ascii=False, indent=2),
@@ -80,6 +80,7 @@ async def contract_markdown_generation_node(state, llm, config: RunnableConfig |
     },
     config=config
     )
+    raw = response.content
 
     markdown = _strip_code_fence(raw)
 

@@ -5,14 +5,12 @@ from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 
 from .nodes import answer_node
-from .state import SimpleQuestionAgentState
-
-from ..llm_client import GigaChatClient
+from .state import GeneralQuestionAgentState
 
 from ...memory import memory_node
 
 
-def create_graph(llm: GigaChatClient) -> StateGraph:
+def create_graph(llm) -> StateGraph:
     """
     Создаёт граф агента простых вопросов.
     
@@ -23,18 +21,18 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     """
 
     async def memory_node_wrapper(
-        state: SimpleQuestionAgentState, 
+        state: GeneralQuestionAgentState, 
         config: RunnableConfig | None = None
     ) -> dict[str, Any]:
         return await memory_node(state, llm, config=config)
 
     async def answer_node_wrapper(
-        state: SimpleQuestionAgentState, 
+        state: GeneralQuestionAgentState, 
         config: RunnableConfig | None = None
     ) -> dict[str, Any]:
         return await answer_node(state, llm, config=config)
 
-    graph = StateGraph(SimpleQuestionAgentState)
+    graph = StateGraph(GeneralQuestionAgentState)
 
     graph.add_node("memory", memory_node_wrapper)
     graph.add_node("answer", answer_node_wrapper)
@@ -47,9 +45,9 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     return graph
 
 
-class SimpleQuestionAgent:
-    def __init__(self, llm: GigaChatClient | None = None) -> None:
-        self.llm = llm or GigaChatClient()
+class GeneralQuestionsAgent:
+    def __init__(self, llm) -> None:
+        self.llm = llm
         # Временное решение для сохранения состояния между вызовами.
         self.memory = MemorySaver()
         # В проде заменить на RedisSaver или другое долговременное хранилище.
@@ -70,7 +68,7 @@ class SimpleQuestionAgent:
         result = await self.graph.ainvoke(
             input_state,
             config={
-                "run_name": "SimpleQuestionAgent",
+                "run_name": "GeneralQuestionAgent",
                 "configurable": {
                     "thread_id": thread_id
                 }

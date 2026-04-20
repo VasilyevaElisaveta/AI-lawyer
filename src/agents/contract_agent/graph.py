@@ -7,12 +7,10 @@ from langchain_core.runnables import RunnableConfig
 from .nodes import *
 from .state import ContractAgentState
 
-from ..llm_client import GigaChatClient
-
 from ...memory import memory_node
 
 
-def create_graph(llm: GigaChatClient) -> StateGraph:
+def create_graph(llm) -> StateGraph:
     """Создаёт граф агента."""
 
     # Создаём wrapper функции для узлов с LLM
@@ -96,8 +94,8 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
 
 
 class ContractAgent:
-    def __init__(self, llm: GigaChatClient | None = None) -> None:
-        self.llm = llm or GigaChatClient()
+    def __init__(self, llm) -> None:
+        self.llm = llm
         # Временное решение для сохранения состояния между вызовами.
         self.memory = MemorySaver()
         # В проде заменить на RedisSaver или другое долговременное хранилище.

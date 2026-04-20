@@ -7,10 +7,8 @@ from langchain_core.runnables import RunnableConfig
 from .nodes import classification_node
 from .state import RouterAgentState
 
-from ..llm_client import GigaChatClient
 
-
-def create_graph(llm: GigaChatClient) -> StateGraph:
+def create_graph(llm) -> StateGraph:
     """
     Создаёт граф маршрутизирующего агента.
 
@@ -39,8 +37,8 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
 
 
 class RouterAgent:
-    def __init__(self, llm: GigaChatClient | None = None) -> None:
-        self.llm = llm or GigaChatClient()
+    def __init__(self, llm) -> None:
+        self.llm = llm
         # Временное решение для сохранения состояния между вызовами.
         self.memory = MemorySaver()
         # В проде заменить на RedisSaver или другое долговременное хранилище.

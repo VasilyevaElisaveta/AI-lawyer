@@ -1,14 +1,10 @@
-from __future__ import annotations
-
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
-
-from src.agents.llm_client import GigaChatClient
 
 
 async def summarize_messages(
     messages,
-    llm: GigaChatClient,
+    llm,
     previous_summary: str | None = None,
     config: RunnableConfig | None = None
 ) -> str:
@@ -54,6 +50,7 @@ async def summarize_messages(
     """
 
     prompt = HumanMessage(content=content)
-    summary = await llm.ainvoke([prompt], config=config)
+    response = await llm.ainvoke([prompt], config=config)
+    summary = response.content
 
     return summary

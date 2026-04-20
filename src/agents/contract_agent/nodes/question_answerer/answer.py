@@ -28,14 +28,15 @@ async def contract_answer_decision_node(state, llm, config: RunnableConfig | Non
         print("summarized_documents_str not in state")
 
     input_d = make_decision_dict(raw_input, messages_str, summarized_documents_str)
-    prompt = ChatPromptTemplate.from_messages(
-        ("system", DECISION_SYSTEM)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", DECISION_SYSTEM),
         ("human", DECISION_PROMPT)
-    )
+    ])
 
     chain = prompt | llm
 
-    raw = await chain.ainvoke(input_d, config=config)
+    response = await chain.ainvoke(input_d, config=config)
+    raw = response.content
     decision = safe_parse_json(raw)
 
     d = {
@@ -73,14 +74,15 @@ async def contract_answer_with_docs_node(state, llm, config: RunnableConfig | No
     context = "\n\n".join(selected_docs)
 
     input_d = make_answer_dict(raw_input, context)
-    prompt = ChatPromptTemplate.from_messages(
-        ("system", ANSWER_SYSTEM)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", ANSWER_SYSTEM),
         ("human", ANSWER_PROMPT)
-    )
+    ])
 
     chain = prompt | llm
 
-    answer = await chain.ainvoke(input_d, config=config)
+    response = await chain.ainvoke(input_d, config=config)
+    answer = response.content
     messages = state.get("messages", []) or []
     if answer:
         messages.append(AIMessage(content=answer))

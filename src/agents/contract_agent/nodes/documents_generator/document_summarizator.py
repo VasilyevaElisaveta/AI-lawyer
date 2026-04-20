@@ -31,12 +31,13 @@ async def contract_document_summary_node(state, llm, config: RunnableConfig | No
     ])
     chain = prompt | llm
 
-    raw = await chain.ainvoke({
+    response = await chain.ainvoke({
         "contract_type": contract_type,
         "markdown": markdown,
     },
     config=config
     )
+    raw = response.content
 
     summary = _strip_code_fence(raw)
 

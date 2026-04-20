@@ -2,16 +2,16 @@ from typing import Any
 
 from .base import BaseGraphAgent
 
-from .....agents.simple_questions_agent import SimpleQuestionAgent
+from .....agents.general_questions_agent import GeneralQuestionsAgent
 
 
-class SimpleAgent(BaseGraphAgent):
-    def __init__(self):
-        self.agent = SimpleQuestionAgent()
+class GeneralQuestionsGraphAgent(BaseGraphAgent):
+    def __init__(self, llm):
+        self.agent = GeneralQuestionsAgent(llm)
 
     async def run(self, message: str, thread_id: str) -> dict[str, Any]:
         """
-        Запускает агент простых вопросов.
+        Запускает агент общих вопросов.
         
         Returns:
             dict с полями:

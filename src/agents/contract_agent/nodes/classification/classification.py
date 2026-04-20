@@ -21,14 +21,15 @@ async def contract_classification_node(
     raw_input = state.get("raw_input", "")
 
     input_d = make_classification_dict(raw_input)
-    prompt = ChatPromptTemplate.from_messages(
-        ("system", CLASSIFICATION_SYSTEM)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", CLASSIFICATION_SYSTEM),
         ("human", CLASSIFICATION_PROMPT)
-    )
+    ])
 
     chain = prompt | llm
 
-    decision = await chain.ainvoke(input_d, config=config)
+    response = await chain.ainvoke(input_d, config=config)
+    decision = response.content
     d = {
         "contract_class": decision,
     }

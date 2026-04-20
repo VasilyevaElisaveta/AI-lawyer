@@ -67,13 +67,14 @@ async def contract_generator_intake_node(state, llm, config: RunnableConfig | No
 
         chain = prompt | llm
 
-        raw = await chain.ainvoke({
+        response = await chain.ainvoke({
             "raw_input": raw_input,
             "messages_str": messages_str,
             "conversation_summary": conversation_summary,
         },
         config=config
         )
+        raw = response.content
 
         parsed = safe_parse_json(raw)
         new_type = parsed.get("contract_type")
@@ -101,7 +102,7 @@ async def contract_generator_intake_node(state, llm, config: RunnableConfig | No
 
         chain = prompt | llm
 
-        raw = await chain.ainvoke({
+        response = await chain.ainvoke({
             "existing_fields": json.dumps(collected_fields, ensure_ascii=False),
             "target_fields": target_fields,
             "raw_input": raw_input,
@@ -110,6 +111,7 @@ async def contract_generator_intake_node(state, llm, config: RunnableConfig | No
         },
         config=config
         )
+        raw = response.content
 
         parsed = safe_parse_json(raw)
         new_fields = parsed.get("fields", {})

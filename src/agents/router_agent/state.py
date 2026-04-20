@@ -20,7 +20,7 @@ class RouterAgentState(TypedDict, total=False):
     raw_input: str                  # свободный текст от пользователя
 
     # ── Результaты классификации ──────────────────────────
-    category: Literal["contract", "lawsuit", "pretrial_claim", "simple_question"]
+    category: Literal["contract", "lawsuit", "pretrial_claim", "general_question"]
     classification_confidence: float  # уверенность в классификации (0.0 - 1.0)
     classification_result: dict[str, Any]  # полный результат от LLM
 
@@ -30,4 +30,4 @@ class RouterAgentState(TypedDict, total=False):
 
     # ── Финальный результат ────────────────────────────────
     reply: str                       # ответ коридору (к пользователю)
-    routed_to: str                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "simple_question_agent", "none"
+    routed_to: str                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "general_question_agent", "none"
