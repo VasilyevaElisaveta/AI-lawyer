@@ -7,9 +7,9 @@ CLASSIFY_SYSTEM = \
 - rent
 - services
 Верни строго JSON:
-{
+{{
   "contract_type": "nda/rent/service"
-}
+}}
 """
 
 CLASSIFY_PROMPT = \
@@ -32,12 +32,12 @@ EXTRACT_SYSTEM = \
 - Если данных нет — пропусти поле
 - Верни строго JSON
 Формат:
-{
-  "fields": {
+{{
+  "fields": {{
     "parties": "...",
     "subject": "..."
-  }
-}
+  }}
+}}
 """
 
 EXTRACT_PROMPT = \

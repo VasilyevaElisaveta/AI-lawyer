@@ -36,7 +36,6 @@ def create_app() -> FastAPI:
     async def startup_event():
         logger.info(f"=== {settings.APP_NAME} v{settings.APP_VERSION} запущен ===")
         logger.info(f"Debug mode: {settings.DEBUG}")
-        logger.info(f"LLM Model: {settings.LLM_MODEL}")
     
     @app.on_event("shutdown")
     async def shutdown_event():

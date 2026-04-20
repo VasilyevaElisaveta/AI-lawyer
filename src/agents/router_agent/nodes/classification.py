@@ -99,7 +99,7 @@ async def classification_node(
     if is_implemented:
         result["routed_to"] = {
             "contract": "contract_agent",
-            "general_question": "general_question_agent",
+            "general_question": "general_questions_agent",
         }.get(category, "none")
         result["reply"] = ""
     else:

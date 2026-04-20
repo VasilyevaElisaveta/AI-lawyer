@@ -74,7 +74,7 @@ class AgentService:
             # Иначе используем router для классификации
             logger.info("Использование router agent для классификации...")
             route_result = await self.router_agent.run(request.raw_input, request.thread_id)
-            route = route_result.get("routed_to", "general_question")
+            route = route_result.get("routed_to", "general_questions_agent")
             
             logger.info(f"Запрос классифицирован как: {route}")
 
@@ -82,7 +82,7 @@ class AgentService:
             if route == "contract_agent":
                 logger.info("Маршрутизация на contract_agent...")
                 result = await self.contract_agent.run(request.raw_input, request.thread_id)
-            elif route == "general_agent":
+            elif route == "general_questions_agent":
                 logger.info("Маршрутизация на general_agent...")
                 result = await self.general_agent.run(request.raw_input, request.thread_id)
             else:
