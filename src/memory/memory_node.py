@@ -1,17 +1,17 @@
 from typing import Any
 
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from .config import SUMMARY_TRIGGER_TOKENS, KEEP_LAST_MESSAGES
 from .token_counter import TokenCounter
 from .summarizer import summarize_messages
 
-from ..agents.llm_client import GigaChatClient
-
 
 async def memory_node(
     state: dict[str, Any],
-    llm: GigaChatClient,
+    llm,
+    config: RunnableConfig | None = None
 ) -> dict[str, Any]:
     """Сокращает историю сообщений и создаёт сводку при переполнении контекста."""
     messages: list[BaseMessage] = state.get("messages") or []
@@ -44,6 +44,7 @@ async def memory_node(
         old_messages,
         llm,
         previous_summary,
+        config=config
     )
 
     state["conversation_summary"] = summary

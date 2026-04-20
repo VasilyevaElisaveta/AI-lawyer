@@ -1,14 +1,18 @@
+import os
 import logging
-from typing import Any
+from dotenv import load_dotenv
 
 from .agents.contract_agent import ContractGraphAgent
-from .agents.simple_agent import SimpleAgent
+from .agents.general_agent import GeneralQuestionsGraphAgent
 from .agents.router_agent import RouterGraphAgent
 
 from ..schemas.chat import ChatRequest, ChatResponse
 
+from ....agents.llm_client import create_gigachat, DEFAULT_GIGACHAT_PARAMS
+
 
 logger = logging.getLogger(__name__)
+load_dotenv()
 
 
 class AgentService:
@@ -16,14 +20,31 @@ class AgentService:
     Сервис для управления всеми агентами инференс сервера.
     
     Использует router agent для классификации запроса, затем маршрутизирует
-    к соответствующему агенту (contract_agent, simple_agent).
+    к соответствующему агенту (contract_agent, general_agent).
     """
     
     def __init__(self):
         logger.info("Инициализация AgentService...")
-        self.router_agent = RouterGraphAgent()
-        self.contract_agent = ContractGraphAgent()
-        self.simple_agent = SimpleAgent()
+        router_kwargs = {
+            "credentials": os.getenv("SBER_AUTH"),
+            **DEFAULT_GIGACHAT_PARAMS
+        }
+        contract_kwargs = {
+            "credentials": os.getenv("SBER_AUTH"),
+            **DEFAULT_GIGACHAT_PARAMS
+        }
+        general_kwargs = {
+            "credentials": os.getenv("SBER_AUTH"),
+            **DEFAULT_GIGACHAT_PARAMS
+        }
+
+        router_llm = create_gigachat("GigaChat", **router_kwargs)
+        contract_llm = create_gigachat("GigaChat", **contract_kwargs)
+        general_llm = create_gigachat("GigaChat", **general_kwargs)
+
+        self.router_agent = RouterGraphAgent(router_llm)
+        self.contract_agent = ContractGraphAgent(contract_llm)
+        self.general_agent = GeneralQuestionsGraphAgent(general_llm)
         logger.info("AgentService инициализирован успешно")
 
     async def process(self, request: ChatRequest) -> ChatResponse:
@@ -53,21 +74,20 @@ class AgentService:
             # Иначе используем router для классификации
             logger.info("Использование router agent для классификации...")
             route_result = await self.router_agent.run(request.raw_input, request.thread_id)
-            route = route_result.get("route", "simple_agent")
-            category = route_result.get("category", "simple_question")
+            route = route_result.get("routed_to", "general_questions_agent")
             
-            logger.info(f"Запрос классифицирован как: {category}, маршрут: {route}")
+            logger.info(f"Запрос классифицирован как: {route}")
 
             # Маршрутизируем к соответствующему агенту
             if route == "contract_agent":
                 logger.info("Маршрутизация на contract_agent...")
                 result = await self.contract_agent.run(request.raw_input, request.thread_id)
-            elif route == "simple_agent":
-                logger.info("Маршрутизация на simple_agent...")
-                result = await self.simple_agent.run(request.raw_input, request.thread_id)
+            elif route == "general_questions_agent":
+                logger.info("Маршрутизация на general_agent...")
+                result = await self.general_agent.run(request.raw_input, request.thread_id)
             else:
-                logger.warning(f"Неизвестный маршрут: {route}, используем simple_agent")
-                result = await self.simple_agent.run(request.raw_input, request.thread_id)
+                logger.warning(f"Неизвестный маршрут: {route}, используем general_agent")
+                result = await self.general_agent.run(request.raw_input, request.thread_id)
 
             response = self._to_response(result)
             logger.info(f"Ответ готов: {len(response.reply)} символов")
@@ -86,9 +106,9 @@ class AgentService:
         mapping = {
             "contract": self.contract_agent,
             "contract_agent": self.contract_agent,
-            "simple": self.simple_agent,
-            "simple_agent": self.simple_agent,
-            "simple_question": self.simple_agent,
+            "general": self.general_agent,
+            "general_agent": self.general_agent,
+            "general_question": self.general_agent,
             "router": self.router_agent,
             "router_agent": self.router_agent,
         }

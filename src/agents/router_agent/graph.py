@@ -2,14 +2,13 @@ from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from langchain_core.runnables import RunnableConfig
 
 from .nodes import classification_node
 from .state import RouterAgentState
 
-from ..llm_client import GigaChatClient
 
-
-def create_graph(llm: GigaChatClient) -> StateGraph:
+def create_graph(llm) -> StateGraph:
     """
     Создаёт граф маршрутизирующего агента.
 
@@ -19,8 +18,11 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
     После классификации граф завершает работу, передавая результат классификации.
     """
 
-    async def classification_node_wrapper(state: RouterAgentState) -> dict[str, Any]:
-        return await classification_node(state, llm)
+    async def classification_node_wrapper(
+        state: RouterAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await classification_node(state, llm, config=config)
 
     graph = StateGraph(RouterAgentState)
 
@@ -35,8 +37,8 @@ def create_graph(llm: GigaChatClient) -> StateGraph:
 
 
 class RouterAgent:
-    def __init__(self, llm: GigaChatClient | None = None) -> None:
-        self.llm = llm or GigaChatClient()
+    def __init__(self, llm) -> None:
+        self.llm = llm
         # Временное решение для сохранения состояния между вызовами.
         self.memory = MemorySaver()
         # В проде заменить на RedisSaver или другое долговременное хранилище.
@@ -57,6 +59,7 @@ class RouterAgent:
         result = await self.graph.ainvoke(
             input_state,
             config={
+                "run_name": "RouterAgent",
                 "configurable": {
                     "thread_id": thread_id
                 }

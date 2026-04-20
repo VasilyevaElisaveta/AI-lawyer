@@ -1,6 +1,7 @@
 import re
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 from .prompts import CONTRACT_SUMMARY_SYSTEM, CONTRACT_SUMMARY_PROMPT
 
@@ -19,7 +20,7 @@ def _strip_code_fence(text: str) -> str:
     return t.strip()
 
 
-async def contract_document_summary_node(state, llm):
+async def contract_document_summary_node(state, llm, config: RunnableConfig | None = None):
     logger.info("Start...")
     contract_type = state.get("contract_type")
     markdown = _normalize_space(state.get("generated_markdown", ""))
@@ -30,10 +31,13 @@ async def contract_document_summary_node(state, llm):
     ])
     chain = prompt | llm
 
-    raw = await chain.ainvoke({
+    response = await chain.ainvoke({
         "contract_type": contract_type,
         "markdown": markdown,
-    })
+    },
+    config=config
+    )
+    raw = response.content
 
     summary = _strip_code_fence(raw)
 

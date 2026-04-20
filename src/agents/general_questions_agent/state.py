@@ -3,9 +3,9 @@ from typing import Annotated, TypedDict
 from langgraph.graph.message import add_messages
 
 
-class SimpleQuestionAgentState(TypedDict, total=False):
+class GeneralQuestionAgentState(TypedDict, total=False):
     """
-    Состояние агента простых вопросов.
+    Состояние агента общих вопросов.
     
     total=False → все поля опциональны на уровне TypedDict.
     В коде узлов используем state.get("field", default).

@@ -1,5 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage
+from langchain_core.runnables import RunnableConfig
 
 from .promtps import (
     make_decision_dict, make_answer_dict,
@@ -14,7 +15,7 @@ from .....utils import LoggerFactory
 logger = LoggerFactory.get_logger("ContractAgentQuestionAnswererAnswerNode")
 
 
-async def contract_answer_decision_node(state, llm):
+async def contract_answer_decision_node(state, llm, config: RunnableConfig | None = None):
     logger.info("Start...")
     raw_input = state.get("raw_input", "")
     if not raw_input:
@@ -27,14 +28,15 @@ async def contract_answer_decision_node(state, llm):
         print("summarized_documents_str not in state")
 
     input_d = make_decision_dict(raw_input, messages_str, summarized_documents_str)
-    prompt = ChatPromptTemplate.from_messages(
-        ("system", DECISION_SYSTEM)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", DECISION_SYSTEM),
         ("human", DECISION_PROMPT)
-    )
+    ])
 
     chain = prompt | llm
 
-    raw = await chain.ainvoke(input_d)
+    response = await chain.ainvoke(input_d, config=config)
+    raw = response.content
     decision = safe_parse_json(raw)
 
     d = {
@@ -55,7 +57,7 @@ def contract_document_answer_decision_router(state):
     return decision_node
 
 
-async def contract_answer_with_docs_node(state, llm):
+async def contract_answer_with_docs_node(state, llm, config: RunnableConfig | None = None):
     logger.info("Start...")
     raw_input = state.get("raw_input", "")
     decision = state.get("decision", {})
@@ -72,14 +74,15 @@ async def contract_answer_with_docs_node(state, llm):
     context = "\n\n".join(selected_docs)
 
     input_d = make_answer_dict(raw_input, context)
-    prompt = ChatPromptTemplate.from_messages(
-        ("system", ANSWER_SYSTEM)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", ANSWER_SYSTEM),
         ("human", ANSWER_PROMPT)
-    )
+    ])
 
     chain = prompt | llm
 
-    answer = await chain.ainvoke(input_d)
+    response = await chain.ainvoke(input_d, config=config)
+    answer = response.content
     messages = state.get("messages", []) or []
     if answer:
         messages.append(AIMessage(content=answer))

@@ -2,6 +2,7 @@ from .classification.classification import contract_classification_node, contrac
 
 from .documents_generator.contract_intake import (
     contract_generator_intake_node, 
+    contract_generator_intake_validation_node,
     contract_generator_validation_router
 )
 from .documents_generator.document_qa import (
@@ -24,7 +25,7 @@ from .question_answerer.intake import contract_question_intake_node
 __all__ = [
     "contract_classification_node", "contract_classification_router",
 
-    "contract_generator_intake_node", "contract_generator_validation_router",
+    "contract_generator_intake_node", "contract_generator_intake_validation_node", "contract_generator_validation_router",
     "contract_markdown_validation_node", "contract_markdown_validation_router",
     "contract_document_summary_node",
     "contract_docx_generation_node",

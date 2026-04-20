@@ -7,7 +7,7 @@ from .utils import (
     documents_to_str,
     safe_parse_list_int
 )
-from .llm_client import GigaChatClient
+from .llm_client import create_gigachat
 
 __all__ = [
     "safe_parse_json", 
@@ -18,5 +18,5 @@ __all__ = [
     "documents_to_str",
     "safe_parse_list_int", 
 
-    "GigaChatClient",
+    "create_gigachat",
 ]

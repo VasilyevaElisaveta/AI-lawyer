@@ -65,7 +65,7 @@ async def invoke_with_agent_type(
     Эндпоинт для обработки запроса конкретным агентом.
     
     Args:
-        agent_type: тип агента (contract, simple, router)
+        agent_type: тип агента (contract, general, router)
         request: ChatRequest
         service: AgentService для обработки
         

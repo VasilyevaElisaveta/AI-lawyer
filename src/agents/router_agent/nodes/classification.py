@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
-from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
 from .prompts import (
     ROUTER_CLASSIFICATION_SYSTEM,
@@ -12,7 +12,6 @@ from .prompts import (
 
 from ..state import RouterAgentState
 
-from ...llm_client import GigaChatClient
 from ...utils import safe_parse_json, render_template
 
 from ....utils import LoggerFactory
@@ -22,8 +21,9 @@ logger = LoggerFactory.get_logger("RouterAgentClassificationNode")
 
 async def classification_node(
         state: RouterAgentState, 
-        llm: GigaChatClient, 
-        previous_node: str | None = None
+        llm, 
+        previous_node: str | None = None,
+        config: RunnableConfig | None = None
 ) -> Dict[str, Any]:
     """
     Узел классификации: определяет категорию запроса пользователя.
@@ -32,7 +32,7 @@ async def classification_node(
     - contract (договоры)
     - lawsuit (иски)
     - pretrial_claim (досудебные претензии)
-    - simple_question (простые вопросы)
+    - general_question (простые вопросы)
     
     Возвращает обновлённое состояние с результатом классификации.
     """
@@ -52,16 +52,20 @@ async def classification_node(
             "reply": "",
         }
     
-    prompt = ChatPromptTemplate.from_messages(
+    prompt = ChatPromptTemplate.from_messages([
         ("system", ROUTER_CLASSIFICATION_SYSTEM),
         ("human", ROUTER_CLASSIFICATION_PROMPT)
-    )
+    ])
     
+    chain = prompt | llm
     try:
-        response = await llm.ainvoke({
+        response = await chain.ainvoke({
             "raw_input": raw_input
-        })
-        classification_result = safe_parse_json(response)
+        },
+        config=config
+        )
+        raw = response.content
+        classification_result = safe_parse_json(raw)
     except Exception as e:
         return {
             "error_message": f"Ошибка при классификации: {str(e)}",
@@ -76,7 +80,7 @@ async def classification_node(
             "routed_to": "none",
         }
     
-    category = classification_result.get("category", "simple_question")
+    category = classification_result.get("category", "general_question")
     confidence = classification_result.get("confidence", 0.0)
     
     # Определяем, реализован ли обработчик для этой категории
@@ -95,7 +99,7 @@ async def classification_node(
     if is_implemented:
         result["routed_to"] = {
             "contract": "contract_agent",
-            "simple_question": "simple_question_agent",
+            "general_question": "general_questions_agent",
         }.get(category, "none")
         result["reply"] = ""
     else:

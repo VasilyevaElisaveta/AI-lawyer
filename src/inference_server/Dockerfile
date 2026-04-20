@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Установка переменных окружения
 ENV PYTHONUNBUFFERED=1 \
@@ -7,16 +7,17 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONPATH=/app/src
 
+COPY src/inference_server/requirements.txt ./
+
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install "uvicorn[standard]>=0.30.0" && \
+    pip install -r requirements.txt
+
 # Установка рабочей директории
 WORKDIR /app
 
 # Копирование файлов проекта
 COPY . /app
-
-# Установка зависимостей
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install -e src/inference_server && \
-    pip install uvicorn[standard]>=0.30.0
 
 # Expose порт
 EXPOSE 8000

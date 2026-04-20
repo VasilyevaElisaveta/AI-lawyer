@@ -38,6 +38,7 @@ def contract_markdown_validation_node(state):
     logger.info("Start...")
     contract_type = state.get("contract_type")
     markdown = _normalize_space(state.get("generated_markdown", ""))
+    logger.debug(f"Got generated_markdown: {markdown}")
     template = CONTRACT_TEMPLATES.get(contract_type)
 
     errors: list[str] = []
@@ -98,7 +99,8 @@ def contract_markdown_validation_node(state):
         f"markdown errors: {state["markdown_validation_errors"]}\n" \
         f"markdown is valid: {state["markdown_is_valid"]}\n" \
         f"qa_passed: {state["qa_passed"]}\n" \
-        f"qa_feedback: {state["qa_feedback"]}"
+        f"qa_feedback: {state["qa_feedback"]}\n" \
+        f"attempts: {state["markdown_generation_attempts"]}"
     )
     logger.info("Finish")
     return state
@@ -108,6 +110,7 @@ def contract_markdown_validation_router(state) -> Literal["markdown_generation",
     logger.info("Start router...")
     # Prevent infinite loops - limit to 3 attempts
     attempts = state.get("markdown_generation_attempts", 0)
+    logger.debug(f"Got attempts: {attempts}")
     if attempts >= 3:
         # Force generation even if invalid after 3 attempts
         logger.warning("Markdown generation limit exceeded")

@@ -1,11 +1,10 @@
 import json
-from typing import Literal
+from typing import Any, Dict, Literal
 
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
-from .prompts import (
-    CLASSIFY_SYSTEM, CLASSIFY_PROMPT, EXTRACT_SYSTEM, EXTRACT_PROMPT
-)
+from .prompts import CLASSIFY_SYSTEM, CLASSIFY_PROMPT, EXTRACT_SYSTEM, EXTRACT_PROMPT
 from .contract_fields import CONTRACT_FIELDS
 
 from ....utils import safe_parse_json, messages_to_str
@@ -16,128 +15,149 @@ from .....utils import LoggerFactory
 logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorIntakeNode")
 
 
-def _clear_previous_run_results(state):
-    state["generated_docx_base64"] = None
-    state["response_to_user"] = None
-    state["markdown_generation_attempts"] = 0
+def _clear_previous_run_results(update: Dict[str, Any]) -> None:
+    update["generated_docx_base64"] = None
+    update["response_to_user"] = None
+    update["markdown_generation_attempts"] = 0
     logger.info("Previous run results cleared")
 
 
-def _get_missing_fields(state):
+def _get_missing_fields(state: Dict[str, Any]) -> list[str]:
     contract_type = state.get("contract_type")
-    collected = state.get("collected_fields", {})
-
+    collected = state.get("collected_fields", {}) or {}
     if not contract_type:
         return []
-
     schema = CONTRACT_FIELDS.get(contract_type, {})
-
     required = [f["id"] for f in schema.get("required", [])]
     optional = [f["id"] for f in schema.get("optional", [])]
-
     return [f for f in required + optional if f not in collected]
 
 
-def _update_collected_fields(state, new_data):
-    collected = state.get("collected_fields", {})
+def _update_collected_fields(state: Dict[str, Any], new_data: Dict[str, Any]) -> Dict[str, Any]:
+    collected = dict(state.get("collected_fields", {}) or {})
     collected.update(new_data)
     return collected
 
 
-async def contract_generator_intake_node(state, llm):
+async def contract_generator_intake_node(
+    state,
+    llm,
+    config: RunnableConfig | None = None
+):
     logger.info("Start...")
+
     raw_input = state.get("raw_input", "")
     if not raw_input:
-        return {"error": "Нет входных данных. Передайте raw_input."}
-    messages = state.get("messages", [])
+        return {
+            "error": "Нет входных данных. Передайте raw_input.",
+            "response_to_user": "Нет входных данных. Передайте raw_input.",
+            "is_valid": False,
+        }
+
+    messages = state.get("messages", []) or []
     messages_str = messages_to_str(messages)
     conversation_summary = state.get("conversation_summary", "")
 
-    contract_type = state.get("contract_type")
-    collected_fields = state.get("collected_fields", {})
+    updates: Dict[str, Any] = {}
+    _clear_previous_run_results(updates)
 
-    d = {}
+    contract_type = state.get("contract_type")
+    collected_fields = dict(state.get("collected_fields", {}) or {})
 
     if not contract_type:
         prompt = ChatPromptTemplate.from_messages([
             ("system", CLASSIFY_SYSTEM),
             ("human", CLASSIFY_PROMPT),
         ])
-
         chain = prompt | llm
 
-        raw = await chain.ainvoke({
-            "raw_input": raw_input,
-            "messages_str": messages_str,
-            "conversation_summary": conversation_summary,
+        response = await chain.ainvoke(
+            {
+                "raw_input": raw_input,
+                "messages_str": messages_str,
+                "conversation_summary": conversation_summary,
+            },
+            config=config,
+        )
 
-        })
-
-        parsed = safe_parse_json(raw)
+        parsed = safe_parse_json(response.content)
         new_type = parsed.get("contract_type")
+        logger.debug(f"Got contract type: {new_type}")
 
         if new_type:
             contract_type = new_type
-            d["contract_type"] = new_type
-            d["contract_fields"] = CONTRACT_FIELDS.get(new_type, {})
-    
-    _clear_previous_run_results(state)
+            updates["contract_type"] = new_type
+            updates["contract_fields"] = CONTRACT_FIELDS.get(new_type, {})
 
-    # если тип так и не определился — дальше смысла нет
+    merged_state = {**state, **updates}
+    merged_state["contract_type"] = contract_type
+    merged_state["collected_fields"] = collected_fields
+
     if not contract_type:
-        state.update(d)
+        updates["doc_type"] = "contract"
+        updates["current_node"] = "contract"
+        updates["is_valid"] = False
+        updates["response_to_user"] = "Не удалось определить тип договора. Пожалуйста, уточните запрос."
         logger.warning("Unable to identify contract type")
-        return state
+        logger.info("Finish")
+        return updates
 
-    target_fields = _get_missing_fields(state)
+    target_fields = _get_missing_fields(merged_state)
+    logger.debug(f"Get target fields: {target_fields}")
 
     if target_fields:
         prompt = ChatPromptTemplate.from_messages([
             ("system", EXTRACT_SYSTEM),
             ("human", EXTRACT_PROMPT),
         ])
-
         chain = prompt | llm
 
-        raw = await chain.ainvoke({
-            "existing_fields": json.dumps(collected_fields, ensure_ascii=False),
-            "target_fields": target_fields,
-            "raw_input": raw_input,
-            "messages_str": messages_str,
-            "conversation_summary": conversation_summary,
-        })
+        response = await chain.ainvoke(
+            {
+                "existing_fields": json.dumps(collected_fields, ensure_ascii=False),
+                "target_fields": target_fields,
+                "raw_input": raw_input,
+                "messages_str": messages_str,
+                "conversation_summary": conversation_summary,
+            },
+            config=config,
+        )
 
-        parsed = safe_parse_json(raw)
-        new_fields = parsed.get("fields", {})
+        parsed = safe_parse_json(response.content)
+        new_fields = parsed.get("fields", {}) or {}
 
         if new_fields:
-            updated = _update_collected_fields(state, new_fields)
-            d["collected_fields"] = updated
+            updates["collected_fields"] = _update_collected_fields(merged_state, new_fields)
 
-    d["doc_type"] = "contract"
-    d["current_node"] = "contract"
+    updates["doc_type"] = "contract"
+    updates["current_node"] = "contract"
 
-    state.update(d)
-    logger.debug(f"Got result collected_fields: {d.get("collected_fields", "")}")
+    logger.debug(f"Got result collected_fields: {updates.get('collected_fields', collected_fields)}")
     logger.info("Finish")
-    return state
+    return updates
 
 
-def contract_generator_validation_router(state) -> Literal["generation", "final"]:
-    logger.info("Start router...")
+async def contract_generator_intake_validation_node(state) -> Dict[str, Any]:
+    logger.info("Start...")
+
     contract_type = state.get("contract_type")
-    collected = state.get("collected_fields", {})
     if not contract_type:
-        state["is_valid"] = False
-        state["response_to_user"] = "Не удалось определить тип договора. Пожалуйста, уточните запрос."
-        return "final"
-    schema = state.get("contract_fields", {})
+        return {
+            "is_valid": False,
+            "validation_errors": [],
+            "response_to_user": "Не удалось определить тип договора. Пожалуйста, уточните запрос.",
+        }
+
+    collected = state.get("collected_fields", {}) or {}
+    schema = state.get("contract_fields", {}) or {}
     required_fields = schema.get("required", [])
+
     field_map = {f["id"]: f["title"] for f in required_fields}
     missing_required = [
         f["id"] for f in required_fields
         if f["id"] not in collected
     ]
+
     if missing_required:
         missing_titles = [
             field_map.get(field_id, field_id)
@@ -147,15 +167,34 @@ def contract_generator_validation_router(state) -> Literal["generation", "final"
             "Для формирования договора необходимо указать:\n\n"
             + "\n".join(f"- {title}" for title in missing_titles)
         )
-        state["validation_errors"] = missing_required
-        state["is_valid"] = False
-        state["response_to_user"] = response_message
-        logger.debug("Selected node: final")
+
+        logger.debug(f"Missing required fields: {missing_required}")
+        logger.debug(f"Response to user: {response_message}")
+
+        return {
+            "validation_errors": missing_required,
+            "is_valid": False,
+            "response_to_user": response_message,
+        }
+
+    logger.debug("Validation passed")
+    return {
+        "validation_errors": [],
+        "is_valid": True,
+        "response_to_user": None,
+    }
+
+
+def contract_generator_validation_router(
+    state
+) -> Literal["markdown_generation", "generator_final"]:
+    logger.info("Start router...")
+
+    if not state.get("is_valid"):
+        logger.debug("Selected node: generator_final")
         logger.info("Finish router")
-        return "final"
-    state["validation_errors"] = []
-    state["is_valid"] = True
-    state["response_to_user"] = None
-    logger.debug("Selected node: generation")
+        return "generator_final"
+
+    logger.debug("Selected node: markdown_generation")
     logger.info("Finish router")
-    return "generation"
+    return "markdown_generation"
