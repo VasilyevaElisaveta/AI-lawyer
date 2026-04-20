@@ -72,9 +72,3 @@ class TokenService:
                 detail="Indalid token.",
                 headers={"WWW-Authenticate": "Bearer"}
             )
-
-    @staticmethod
-    def refresh_token(token: str) -> str:
-        sub = TokenService.decode_token(token, type="refresh")
-        new_access_token = TokenService.create_token(sub)
-        return new_access_token
