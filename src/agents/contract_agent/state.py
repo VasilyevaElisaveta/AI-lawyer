@@ -51,5 +51,6 @@ class ContractAgentState(TypedDict, total=False):
     generated_markdown: str
     markdown_validation_errors: list[str]
     markdown_is_valid: bool
+    markdown_generation_attempts: int
 
     generated_docx_base64: str

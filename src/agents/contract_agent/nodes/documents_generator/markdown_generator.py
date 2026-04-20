@@ -91,8 +91,8 @@ async def contract_markdown_generation_node(state, llm, config: RunnableConfig |
     logger.debug(
         f"Got result:\n" \
         f"generated markdown: {markdown}\n" \
-        f"markdown errors: {state["markdown_validation_errors"]}\n"
-        f"markdown generation attempt: {state["markdown_generation_attempts"]}"
+        f"markdown errors: {state.get("markdown_validation_errors", "")}\n"
+        f"markdown generation attempt: {state.get("markdown_generation_attempts", "")}"
     )
     logger.info("Finish")
     return state

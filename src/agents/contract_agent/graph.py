@@ -14,7 +14,7 @@ def create_graph(llm) -> StateGraph:
     """Создаёт граф агента."""
 
     # Создаём wrapper функции для узлов с LLM
-    async def summarization_node(
+    async def summarization_node_wrapper(
         state: ContractAgentState,
         config: RunnableConfig | None = None
     ) -> dict[str, Any]:
@@ -31,6 +31,9 @@ def create_graph(llm) -> StateGraph:
         config: RunnableConfig | None = None
     ) -> dict[str, Any]:
         return await contract_generator_intake_node(state, llm, config=config)
+    
+    async def generator_intake_validation_node_wrapper(state: ContractAgentState,) -> dict[str, Any]:
+        return await contract_generator_intake_validation_node(state)
 
     async def markdown_generation_node_wrapper(
         state: ContractAgentState, 
@@ -61,9 +64,10 @@ def create_graph(llm) -> StateGraph:
 
     graph = StateGraph(ContractAgentState)
 
-    graph.add_node("summarization", summarization_node)
+    graph.add_node("summarization", summarization_node_wrapper)
     graph.add_node("classification", classification_node_wrapper)
     graph.add_node("generator_intake", generator_intake_node_wrapper)
+    graph.add_node("generator_intake_validation", generator_intake_validation_node_wrapper)
     graph.add_node("markdown_generation", markdown_generation_node_wrapper)
     graph.add_node("markdown_validation", contract_markdown_validation_node)
     graph.add_node("docx_generation", contract_docx_generation_node)
@@ -79,7 +83,8 @@ def create_graph(llm) -> StateGraph:
     graph.add_edge("summarization", "classification")
     graph.add_conditional_edges("classification", contract_classification_router)
 
-    graph.add_edge("generator_intake", "markdown_generation")
+    graph.add_edge("generator_intake", "generator_intake_validation")
+    graph.add_conditional_edges("generator_intake_validation", contract_generator_validation_router)
     graph.add_edge("markdown_generation", "markdown_validation")
     graph.add_conditional_edges("markdown_validation", contract_markdown_validation_router)
     graph.add_edge("docx_generation", "document_summary")

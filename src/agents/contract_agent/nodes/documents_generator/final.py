@@ -22,8 +22,10 @@ async def contract_generator_final_node(state: ContractAgentState) -> Dict[str, 
     logger.info("Start...")
     if state.get("response_to_user"):
         final_text = state["response_to_user"]
+        logger.debug(f"Get final text: {final_text}")
     elif state.get("generated_docx_base64"):
         final_text = state.get("generated_docx_base64", "")
+        logger.debug(f"Get final text: {final_text}")
         clear_results_before_end(state)
     else:
         final_text = "Произошла ошибка при генерации ответа, повторите попытку позже или в другом чате."
