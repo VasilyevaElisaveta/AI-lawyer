@@ -19,6 +19,7 @@ def _clear_previous_run_results(update: Dict[str, Any]) -> None:
     update["generated_docx_base64"] = None
     update["response_to_user"] = None
     update["markdown_generation_attempts"] = 0
+    update["document_created"] = False
     logger.info("Previous run results cleared")
 
 

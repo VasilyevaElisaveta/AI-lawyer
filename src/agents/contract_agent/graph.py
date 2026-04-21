@@ -140,5 +140,5 @@ class ContractAgent:
         else:
             result["reply"] = result.get("final_document", "")
         result["handled_by_agent"] = True
-        result["document_created"] = bool(result.get("generated_document"))
+        result["document_created"] = bool(result.get("document_created"))
         return result

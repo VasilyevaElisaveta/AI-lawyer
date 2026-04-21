@@ -25,6 +25,8 @@ async def contract_generator_final_node(state: ContractAgentState) -> Dict[str, 
         logger.debug(f"Get final text: {final_text}")
     elif state.get("generated_docx_base64"):
         final_text = state.get("generated_docx_base64", "")
+        state["response_to_user"] = final_text
+        state["document_created"] = True
         logger.debug(f"Get final text: {final_text}")
         clear_results_before_end(state)
     else:
@@ -32,10 +34,12 @@ async def contract_generator_final_node(state: ContractAgentState) -> Dict[str, 
         state["response_to_user"] = final_text
         clear_results_before_end(state)
 
-    messages = state.get("messages", []) or []
-    if final_text:
-        messages.append(AIMessage(content=final_text))
+    messages = state.get("messages", [])
+    markdown_text = state.get("generated_markdown", "")
+    if markdown_text:
+        messages.append(AIMessage(content=markdown_text))
     state["messages"] = messages
-    logger.debug(f"Got result message: {final_text}")
+    logger.debug(f"Got base64 result message: {final_text}")
+    logger.debug(f"Got markdown result message: {markdown_text}")
     logger.info("Finish")
     return dict(state)
