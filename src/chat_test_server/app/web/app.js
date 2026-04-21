@@ -12,6 +12,17 @@ function addMessage(text, role) {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+function downloadBlob(blob, filename) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename || "document.docx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
 async function sendMessage() {
   const text = inputEl.value.trim();
   if (!text) return;
@@ -19,21 +30,50 @@ async function sendMessage() {
   addMessage(text, "user");
   inputEl.value = "";
 
-  const response = await fetch("/api/v1/chat", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      message: text,
-      conversation_id: conversationId,
-    }),
-  });
+  try {
+    const response = await fetch("/api/v1/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: text,
+        conversation_id: conversationId,
+      }),
+    });
 
-  const data = await response.json();
+    const headerConversationId = response.headers.get("x-conversation-id");
+    if (headerConversationId) {
+      conversationId = headerConversationId;
+    }
 
-  conversationId = data.conversation_id;
-  addMessage(data.reply, "bot");
+    const contentType = (response.headers.get("content-type") || "").toLowerCase();
+
+    if (contentType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
+      if (!response.ok) {
+        addMessage("Ошибка при получении документа.", "bot");
+        return;
+      }
+
+      const blob = await response.blob();
+      downloadBlob(blob, `${conversationId || "document"}.docx`);
+      addMessage("Документ готов. Скачивание началось.", "bot");
+      return;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      addMessage(`Ошибка: ${data.detail || "неизвестная ошибка"}`, "bot");
+      return;
+    }
+
+    conversationId = data.conversation_id;
+    addMessage(data.reply || "(пустой ответ)", "bot");
+  } catch (err) {
+    console.error(err);
+    addMessage("Ошибка при отправке сообщения.", "bot");
+  }
 }
 
 sendBtn.onclick = sendMessage;

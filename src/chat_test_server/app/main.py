@@ -20,12 +20,11 @@ def create_app() -> FastAPI:
 
     app.include_router(api_v1_router, prefix=settings.api_v1_prefix)
 
-    # подключаем фронт
-    app.mount("/static", StaticFiles(directory="app/web"), name="static")
+    app.mount("/static", StaticFiles(directory="src/chat_test_server/app/web"), name="static")
 
     @app.get("/")
     async def index():
-        return FileResponse("app/web/index.html")
+        return FileResponse("src/chat_test_server/app/web/index.html")
 
     return app
 

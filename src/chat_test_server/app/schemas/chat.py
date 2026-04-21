@@ -1,5 +1,4 @@
 from uuid import UUID
-
 from pydantic import BaseModel, Field
 
 
@@ -11,4 +10,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     conversation_id: UUID
     message: str
-    reply: str
+    reply: str | None = None
+    document_created: bool = False
+    document_bytes: bytes | None = None
+    document_filename: str | None = None
