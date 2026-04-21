@@ -1,193 +1,282 @@
 """
-Точка входа: CLI-режим для прототипа.
-В будущем здесь будет FastAPI-сервер и интеграция с AI-агентом-маршрутизатором.
+main.py — тест генерации досудебной претензии.
 
-Использование:
-    python main.py                         — демо: исковое заявление
-    python main.py --pretrial              — демо: досудебная претензия
-    python main.py input.json              — из JSON-файла
-    python main.py --text "описание..."    — из свободного текста
+Запуск:
+    python main.py
+
+Что проверяется:
+    1. Структурированный ввод (input_data dict) → pretenziya.docx
+    2. Свободный текст (raw_input str) → печать в консоль
 """
 from __future__ import annotations
 
+import asyncio
+import base64
 import json
-import sys
-
-from app.graph import create_graph
-from app.utils.logger import get_logger
-
-logger = get_logger(__name__)
+import os
+from pathlib import Path
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Публичные функции запуска
+#  Входные данные (структурированный вариант)
+#  Формат: dict, который агент получает как input_data
 # ═══════════════════════════════════════════════════════════════
 
-def run_with_structured_input(data: dict) -> str:
-    """Запуск с готовым словарём данных."""
-    graph = create_graph()
-    result = graph.invoke({"input_data": data, "doc_type": data.get("doc_type", "lawsuit")})
-    return result.get("final_document", result.get("generated_document", ""))
+COMPLAINT_INPUT_STRUCTURED: dict = {
+    # ── Тип документа ────────────────────────────────────────
+    "document_type": "complaint",          # "lawsuit" | "complaint"
 
+    # ── Стороны ───────────────────────────────────────────────
+    "plaintiff_info": (
+        "Смирнова Анна Викторовна, "
+        "место жительства: г. Москва, ул. Академика Королёва, д. 12, кв. 47, "
+        "тел.: +7 (916) 123-45-67, email: smirnova.av@mail.ru"
+    ),
+    "defendant_info": (
+        "ООО «СтройМастер», "
+        "адрес: 115054, г. Москва, ул. Дубининская, д. 57, оф. 301, "
+        "ИНН 7705123456, ОГРН 1197746123456, "
+        "тел.: +7 (495) 987-65-43"
+    ),
 
-def run_with_raw_text(text: str, doc_type: str = "lawsuit") -> str:
-    """Запуск со свободным текстом."""
-    graph = create_graph()
-    result = graph.invoke({"raw_input": text, "doc_type": doc_type})
-    return result.get("final_document", result.get("generated_document", ""))
+    # ── Фабула ────────────────────────────────────────────────
+    "facts": (
+        "15 марта 2025 года между Смирновой А.В. (заказчик) и ООО «СтройМастер» "
+        "(подрядчик) был заключён договор подряда № 47/2025 на выполнение ремонтных "
+        "работ в квартире по адресу: г. Москва, ул. Академика Королёва, д. 12, кв. 47. "
+        "Срок выполнения работ — 60 календарных дней (до 14 мая 2025 года). "
+        "Стоимость работ — 380 000 рублей, которые были оплачены в полном объёме "
+        "платёжным поручением от 16 марта 2025 года.\n"
+        "По состоянию на 01 июня 2025 года работы не завершены: "
+        "не выполнена укладка напольного покрытия в двух комнатах, "
+        "не завершена отделка санузла, отсутствует финальная покраска стен. "
+        "Акт приёма-передачи выполненных работ не подписан. "
+        "Подрядчик на звонки отвечает уклончиво, конкретных сроков завершения не называет."
+    ),
+
+    # ── Документы ─────────────────────────────────────────────
+    "documents": (
+        "Договор подряда № 47/2025 от 15.03.2025; "
+        "Платёжное поручение № 112 от 16.03.2025 на сумму 380 000 руб.; "
+        "Смета на выполнение ремонтных работ от 15.03.2025; "
+        "Фотоматериалы, фиксирующие незавершённость работ (от 01.06.2025)"
+    ),
+
+    # ── Требования ────────────────────────────────────────────
+    "claims": (
+        "Завершить ремонтные работы в срок не позднее 20 дней с момента получения "
+        "настоящей претензии; "
+        "В случае невыполнения требования — вернуть уплаченные денежные средства "
+        "в размере 380 000 рублей и выплатить неустойку за просрочку исполнения."
+    ),
+
+    # ── Суммы ─────────────────────────────────────────────────
+    "principal_amount": 380_000.0,         # сумма по договору
+    "penalty_rate": 0.5,                   # % в день (ЗоЗПП ст. 28, п. 5)
+    "penalty_start_date": "15.05.2025",    # день, следующий за крайним сроком
+    "penalty_end_date": "01.06.2025",      # дата составления претензии
+
+    # ── Параметры претензии ───────────────────────────────────
+    "complaint_type": "monetary",          # "monetary" | "non_monetary"
+    "complaint_sphere": "consumer",        # "consumer" | "commercial" | "labor" | "other"
+    "complaint_sending_method": "mail",    # "in_person" | "mail" | "electronic"
+    "complaint_response_deadline": 10,     # дней (ст. 22 ЗоЗПП)
+    "complaint_deadline_basis": "п. 5 ст. 28 Закона РФ «О защите прав потребителей»",
+}
 
 
 # ═══════════════════════════════════════════════════════════════
-#  CLI
+#  Входные данные (вариант свободного текста)
 # ═══════════════════════════════════════════════════════════════
 
-def main() -> None:
-    if len(sys.argv) > 1 and sys.argv[1] == "--pretrial":
-        logger.info("Running pretrial claim demo")
-        doc = run_with_structured_input(_demo_pretrial_data())
-    elif len(sys.argv) > 1 and sys.argv[1] == "--text":
-        text = " ".join(sys.argv[2:])
-        logger.info("Running with raw text input")
-        doc = run_with_raw_text(text)
-    elif len(sys.argv) > 1 and sys.argv[1].endswith(".json"):
-        filepath = sys.argv[1]
-        logger.info("Running with JSON file: %s", filepath)
-        with open(filepath, encoding="utf-8") as f:
-            data = json.load(f)
-        doc = run_with_structured_input(data)
+COMPLAINT_INPUT_RAW = """\
+Хочу написать претензию.
+
+Я, Петров Сергей Николаевич, проживаю: г. Санкт-Петербург, Невский проспект, д. 88, кв. 14,
+тел. 8-911-222-33-44.
+
+В интернет-магазине ООО «ТехноМаркет» (ИНН 7812345678, адрес: г. Санкт-Петербург,
+ул. Восстания, д. 5) 10 апреля 2025 года купил ноутбук Lenovo IdeaPad за 89 000 рублей
+(чек № 00445 от 10.04.2025). Через 3 недели экран начал мигать и появились горизонтальные
+полосы — явный производственный дефект. 05 мая 2025 года сдал ноутбук в сервисный центр
+магазина для диагностики, получил акт приёма № СЦ-2025-0512.
+
+По состоянию на 02 июня 2025 года ни ремонта, ни ответа нет — прошло уже 28 дней.
+По закону о защите прав потребителей срок ремонта — не более 45 дней, но магазин молчит.
+
+Хочу потребовать либо замены ноутбука, либо возврата 89 000 рублей,
+а также неустойку за каждый день просрочки.
+"""
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Вспомогательные функции
+# ═══════════════════════════════════════════════════════════════
+
+def save_docx(base64_str: str, filename: str) -> Path:
+    """Декодирует base64 и сохраняет DOCX-файл."""
+    output_dir = Path("output")
+    output_dir.mkdir(exist_ok=True)
+    filepath = output_dir / filename
+    filepath.write_bytes(base64.b64decode(base64_str))
+    return filepath
+
+
+def print_separator(title: str) -> None:
+    width = 60
+    print("\n" + "═" * width)
+    print(f"  {title}")
+    print("═" * width)
+
+
+def print_response(result: dict, label: str) -> None:
+    """Красиво выводит результат агента."""
+    print_separator(label)
+    print(f"  handled_by_agent : {result.get('handled_by_agent')}")
+    print(f"  document_created : {result.get('document_created')}")
+    print(f"  document_type    : {result.get('document_type', '—')}")
+    print(f"  status           : {result.get('status', '—')}")
+
+    reply = result.get("reply", "")
+    if result.get("document_created"):
+        # reply — это base64 DOCX
+        print(f"  reply            : <base64 DOCX, {len(reply)} символов>")
+        if result.get("metadata"):
+            meta = result["metadata"]
+            print(f"  metadata.plaintiff : {meta.get('plaintiff', '')[:60]}")
+            print(f"  metadata.defendant : {meta.get('defendant', '')[:60]}")
+            print(f"  metadata.total_claim : {meta.get('total_claim', 0)}")
     else:
-        logger.info("Running lawsuit demo")
-        doc = run_with_structured_input(_demo_lawsuit_data())
-
-    print("\n" + "=" * 80)
-    print(doc)
-    print("=" * 80)
+        # reply — текст (ошибка или сообщение)
+        print(f"  reply (text)     :\n{reply}")
 
 
 # ═══════════════════════════════════════════════════════════════
-#  Демо-данные: исковое заявление
+#  Основной тест
 # ═══════════════════════════════════════════════════════════════
 
-def _demo_lawsuit_data() -> dict:
-    """Тестовые данные для искового заявления (договор займа)."""
-    return {
-        "doc_type": "lawsuit",
+async def test_structured_input() -> None:
+    """
+    Тест 1: структурированный ввод → DOCX-претензия.
+    Агент получает готовый dict через поле input_data.
+    """
+    from claims_agent.graph import ClaimsAgent
+
+    print_separator("ТЕСТ 1: структурированный ввод (pretenziya_stroika.docx)")
+
+    agent = ClaimsAgent()
+
+    # Агент принимает либо JSON-строку, либо dict в поле input_data.
+    # Самый простой способ — передать JSON-строку: агент сам распарсит.
+    message = json.dumps(COMPLAINT_INPUT_STRUCTURED, ensure_ascii=False)
+
+    result = await agent.process_user_message(
+        user_message=message,
+        thread_id="test-complaint-structured-001",
+        document_type="complaint",   # дублируем явно (можно не указывать — есть в JSON)
+    )
+
+    print_response(result, "Результат теста 1")
+
+    if result.get("document_created") and result.get("reply"):
+        path = save_docx(result["reply"], "pretenziya_stroika.docx")
+        print(f"\n  ✓ DOCX сохранён: {path.resolve()}")
+    else:
+        print("\n  ✗ Документ не создан — смотри поле 'reply' выше")
+
+
+async def test_raw_input() -> None:
+    """
+    Тест 2: свободный текст → LLM-извлечение → DOCX-претензия.
+    Агент сам извлекает данные из текста через LLM (intake_node).
+    """
+    from claims_agent.graph import ClaimsAgent
+
+    print_separator("ТЕСТ 2: свободный текст (pretenziya_noutbuk.docx)")
+
+    agent = ClaimsAgent()
+
+    result = await agent.process_user_message(
+        user_message=COMPLAINT_INPUT_RAW,
+        thread_id="test-complaint-raw-002",
+        document_type="complaint",
+    )
+
+    print_response(result, "Результат теста 2")
+
+    if result.get("document_created") and result.get("reply"):
+        path = save_docx(result["reply"], "pretenziya_noutbuk.docx")
+        print(f"\n  ✓ DOCX сохранён: {path.resolve()}")
+    else:
+        print("\n  ✗ Документ не создан — смотри поле 'reply' выше")
+
+
+async def test_lawsuit_still_works() -> None:
+    """
+    Тест 3: убеждаемся, что исковые заявления не сломались.
+    Минимальный структурированный ввод.
+    """
+    from claims_agent.graph import ClaimsAgent
+
+    print_separator("ТЕСТ 3: регрессия — исковое заявление (isk_dolg.docx)")
+
+    agent = ClaimsAgent()
+
+    lawsuit_input = {
+        "document_type": "lawsuit",
         "plaintiff_info": (
-            "Иванов Иван Иванович, 01.01.1985 г.р., "
-            "паспорт серия 4510 номер 123456, выдан УФМС России по г. Москве 15.03.2005, "
-            "ИНН 772501234567, "
-            "адрес: 123456, г. Москва, ул. Ленина, д. 10, кв. 5, "
-            "тел.: +7 (999) 123-45-67, email: ivanov@example.com"
+            "Коваленко Дмитрий Алексеевич, "
+            "адрес: г. Екатеринбург, ул. Ленина, д. 5, кв. 3, "
+            "тел.: +7 (912) 000-11-22"
         ),
         "defendant_info": (
-            'ООО «Ромашка», ИНН 7701234567, ОГРН 1027700123456, '
-            "адрес: 123456, г. Москва, ул. Пушкина, д. 20, офис 100, "
-            'в лице генерального директора Петрова П.П.'
-        ),
-        "third_parties_info": "",
-        "court_info": (
-            "Тверской районный суд города Москвы, "
-            "адрес: 127051, г. Москва, Цветной бульвар, д. 25А"
+            "Захаров Илья Петрович, "
+            "адрес: г. Екатеринбург, ул. Мира, д. 10, кв. 55"
         ),
         "facts": (
-            '15.01.2024 между Ивановым И.И. и ООО «Ромашка» заключён договор '
-            "займа № 15/01-2024, по условиям которого Иванов И.И. передал "
-            'ООО «Ромашка» денежные средства в размере 500 000 рублей сроком '
-            "до 15.07.2024 под 10% годовых. Факт передачи подтверждается "
-            "платёжным поручением № 123 от 15.01.2024. "
-            "Согласно п. 5.2 договора, в случае просрочки возврата заёмщик "
-            "уплачивает неустойку в размере 0,1% от суммы долга за каждый день просрочки. "
-            "По состоянию на 15.01.2025 ответчик сумму займа не вернул, "
-            "на претензию от 20.07.2024 не ответил."
+            "01 января 2024 года Коваленко Д.А. передал Захарову И.П. денежные "
+            "средства в сумме 200 000 рублей по договору займа № 1/2024 сроком "
+            "возврата до 01 июля 2024 года. По истечении срока Захаров И.П. "
+            "денежные средства не вернул, на контакт не выходит."
         ),
         "documents": (
-            "1. Договор займа № 15/01-2024 от 15.01.2024\n"
-            "2. Платёжное поручение № 123 от 15.01.2024\n"
-            "3. Претензия от 20.07.2024 с уведомлением о вручении\n"
-            "4. Квитанция об уплате госпошлины"
+            "Договор займа № 1/2024 от 01.01.2024; "
+            "Расписка о получении денежных средств от 01.01.2024"
         ),
         "claims": (
-            "Взыскать с ответчика сумму основного долга по договору займа, "
-            "проценты за пользование займом, "
-            "неустойку за просрочку возврата, "
-            "неустойку по день фактического исполнения, "
-            "судебные расходы по уплате госпошлины."
+            "Взыскать с ответчика сумму основного долга 200 000 рублей, "
+            "проценты по ст. 395 ГК РФ, судебные расходы."
         ),
-        "pretrial_settlement": (
-            "20.07.2024 ответчику направлена претензия с требованием возврата "
-            "суммы займа в течение 10 дней. Претензия получена ответчиком "
-            "25.07.2024 (уведомление о вручении). Ответа не последовало."
-        ),
-        # ── Суммы ──────────────────────────────
-        "principal_amount": 500_000,
-        # ── Проценты за пользование (ст. 809 ГК) ──
-        "loan_interest_rate": 0.10,       # 10% годовых
-        "loan_start_date": "15.01.2024",  # дата выдачи
-        "loan_end_date": "15.01.2025",    # дата расчёта
-        # ── Неустойка ──────────────────────────
-        "penalty_rate": 0.001,            # 0.1% в день
-        "penalty_start_date": "16.07.2024",
-        "penalty_end_date": "15.01.2025",
-        # ── Флаги ─────────────────────────────
-        "request_ongoing_penalty": True,
-        "request_ongoing_interest": True,
-        # ── Прочее ────────────────────────────
-        "moral_damage": 0,
-        "court_expenses": 0,
+        "principal_amount": 200_000.0,
+        "interest_start_date": "02.07.2024",
+        "interest_end_date": "01.06.2025",
+        "cbr_key_rate": 0.16,
+        "pretrial_settlement": "Претензия направлена 05.07.2024, ответ не получен.",
     }
 
+    message = json.dumps(lawsuit_input, ensure_ascii=False)
+    result = await agent.process_user_message(
+        user_message=message,
+        thread_id="test-lawsuit-regression-003",
+    )
 
-# ═══════════════════════════════════════════════════════════════
-#  Демо-данные: досудебная претензия
-# ═══════════════════════════════════════════════════════════════
+    print_response(result, "Результат теста 3")
 
-def _demo_pretrial_data() -> dict:
-    """Тестовые данные для досудебной претензии (договор займа)."""
-    return {
-        "doc_type": "pretrial_claim",
-        "sender_info": (
-            "Иванов Иван Иванович, ИНН 772501234567, "
-            "адрес: 123456, г. Москва, ул. Ленина, д. 10, кв. 5, "
-            "тел.: +7 (999) 123-45-67, email: ivanov@example.com"
-        ),
-        "recipient_info": (
-            'ООО «Ромашка», ИНН 7701234567, ОГРН 1027700123456, '
-            "адрес: 123456, г. Москва, ул. Пушкина, д. 20, офис 100, "
-            'генеральный директор Петров П.П.'
-        ),
-        "claim_type": "возврат долга по договору займа",
-        "basis": "Договор займа № 15/01-2024 от 15.01.2024",
-        "facts": (
-            '15.01.2024 между Ивановым И.И. и ООО «Ромашка» заключён договор '
-            "займа № 15/01-2024 на сумму 500 000 руб. под 10% годовых "
-            "сроком до 15.07.2024. Факт передачи подтверждён платёжным "
-            "поручением № 123 от 15.01.2024. По договору (п. 5.2) "
-            "неустойка за просрочку — 0,1% в день. "
-            "По состоянию на 15.01.2025 долг не возвращён."
-        ),
-        "supporting_documents": (
-            "1. Договор займа № 15/01-2024 от 15.01.2024\n"
-            "2. Платёжное поручение № 123 от 15.01.2024"
-        ),
-        "sender_demands": (
-            "Вернуть сумму займа 500 000 руб., проценты за пользование, "
-            "неустойку за просрочку."
-        ),
-        "response_deadline": "10 календарных дней с момента получения настоящей претензии",
-        # ── Суммы ──────────────────────────────
-        "principal_amount": 500_000,
-        # ── Проценты за пользование ────────────
-        "loan_interest_rate": 0.10,
-        "loan_start_date": "15.01.2024",
-        "loan_end_date": "15.01.2025",
-        # ── Неустойка ──────────────────────────
-        "penalty_rate": 0.001,
-        "penalty_start_date": "16.07.2024",
-        "penalty_end_date": "15.01.2025",
-        # ── Прочее ────────────────────────────
-        "moral_damage": 0,
-    }
+    if result.get("document_created") and result.get("reply"):
+        path = save_docx(result["reply"], "isk_dolg.docx")
+        print(f"\n  ✓ DOCX сохранён: {path.resolve()}")
+    else:
+        print("\n  ✗ Документ не создан — смотри поле 'reply' выше")
+
+
+async def main() -> None:
+    await test_structured_input()
+    await test_raw_input()
+    await test_lawsuit_still_works()
+
+    print_separator("ВСЕ ТЕСТЫ ЗАВЕРШЕНЫ")
+    print("  Файлы сохранены в ./output/\n")
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
