@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 
 from ..schemas.chat import ChatRequest, ChatResponse
 from ..services.agent_service import AgentService
@@ -12,9 +12,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
 
 
-def get_agent_service():
+def get_agent_service(request: Request):
     """Dependency injection для AgentService."""
-    return AgentService()
+    return request.app.state.agent_service
 
 
 @router.get("/health", response_model=Dict[str, Any])

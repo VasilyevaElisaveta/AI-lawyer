@@ -23,13 +23,13 @@ def _has_placeholder_tokens(markdown: str) -> bool:
 
 
 def _find_heading_block(markdown: str, label: str) -> tuple[int, int] | None:
-    pattern = re.compile(rf"(?ims)^#{1,6}\s+.*{re.escape(label)}.*$", re.MULTILINE)
+    pattern = re.compile(rf"(?im)^#{{1,6}}\s+.*{re.escape(label)}.*$")
     match = pattern.search(markdown)
     if not match:
         return None
 
     start = match.end()
-    next_heading = re.search(r"(?ims)^#{1,6}\s+.+$", markdown[start:])
+    next_heading = re.search(r"(?im)^#{{1,6}}\s+.+$", markdown[start:])
     end = start + next_heading.start() if next_heading else len(markdown)
     return start, end
 

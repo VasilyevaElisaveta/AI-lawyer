@@ -10,7 +10,7 @@ from .state import ContractAgentState
 from ...memory import memory_node
 
 
-def create_graph(llm) -> StateGraph:
+def create_graph(llm, generator_llm=None) -> StateGraph:
     """Создаёт граф агента."""
 
     # Создаём wrapper функции для узлов с LLM
@@ -39,7 +39,11 @@ def create_graph(llm) -> StateGraph:
         state: ContractAgentState, 
         config: RunnableConfig | None = None
     ) -> dict[str, Any]:
-        return await contract_markdown_generation_node(state, llm, config=config)
+        return await contract_markdown_generation_node(
+            state, 
+            llm=llm if generator_llm is None else generator_llm, 
+            config=config
+        )
 
     async def document_summary_node_wrapper(
         state: ContractAgentState, 
@@ -99,8 +103,9 @@ def create_graph(llm) -> StateGraph:
 
 
 class ContractAgent:
-    def __init__(self, llm) -> None:
+    def __init__(self, llm, generator_llm=None) -> None:
         self.llm = llm
+        self.generator_llm = generator_llm
         # Временное решение для сохранения состояния между вызовами.
         self.memory = MemorySaver()
         # В проде заменить на RedisSaver или другое долговременное хранилище.
@@ -109,7 +114,10 @@ class ContractAgent:
         #     "redis://localhost:6379",
         #     key_prefix=f"contract_agent:"
         # )
-        self.graph = create_graph(self.llm).compile(checkpointer=self.memory)
+        self.graph = create_graph(
+            self.llm, 
+            generator_llm=generator_llm
+        ).compile(checkpointer=self.memory)
 
     def _build_input_state(self, user_message: str) -> dict:
         return {

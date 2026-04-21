@@ -24,7 +24,7 @@ def _clear_previous_run_results(update: Dict[str, Any]) -> None:
 
 def _get_missing_fields(state: Dict[str, Any]) -> list[str]:
     contract_type = state.get("contract_type")
-    collected = state.get("collected_fields", {}) or {}
+    collected = state.get("collected_fields", {})
     if not contract_type:
         return []
     schema = CONTRACT_FIELDS.get(contract_type, {})
@@ -33,9 +33,21 @@ def _get_missing_fields(state: Dict[str, Any]) -> list[str]:
     return [f for f in required + optional if f not in collected]
 
 
+def _is_filled(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, dict, tuple, set)):
+        return bool(value)
+    return True
+
+
 def _update_collected_fields(state: Dict[str, Any], new_data: Dict[str, Any]) -> Dict[str, Any]:
     collected = dict(state.get("collected_fields", {}) or {})
-    collected.update(new_data)
+    for key, value in (new_data or {}).items():
+        if _is_filled(value):
+            collected[key] = value
     return collected
 
 
@@ -62,7 +74,8 @@ async def contract_generator_intake_node(
     _clear_previous_run_results(updates)
 
     contract_type = state.get("contract_type")
-    collected_fields = dict(state.get("collected_fields", {}) or {})
+    collected_fields = state.get("collected_fields", {})
+    logger.debug(f"Got START collected_fields: {collected_fields}")
 
     if not contract_type:
         prompt = ChatPromptTemplate.from_messages([
@@ -126,6 +139,8 @@ async def contract_generator_intake_node(
         parsed = safe_parse_json(response.content)
         new_fields = parsed.get("fields", {}) or {}
 
+        updates["collected_fields"] = dict(collected_fields)
+
         if new_fields:
             updates["collected_fields"] = _update_collected_fields(merged_state, new_fields)
 
@@ -141,28 +156,34 @@ async def contract_generator_intake_validation_node(state) -> Dict[str, Any]:
     logger.info("Start...")
 
     contract_type = state.get("contract_type")
+    collected = state.get("collected_fields", {}) or {}
+    schema = state.get("contract_fields", {}) or {}
+
+    base = {
+        "contract_type": contract_type,
+        "contract_fields": schema,
+        "collected_fields": collected,
+        "doc_type": state.get("doc_type", "contract"),
+        "current_node": state.get("current_node", "contract"),
+    }
+
     if not contract_type:
         return {
+            **base,
             "is_valid": False,
             "validation_errors": [],
             "response_to_user": "Не удалось определить тип договора. Пожалуйста, уточните запрос.",
         }
 
-    collected = state.get("collected_fields", {}) or {}
-    schema = state.get("contract_fields", {}) or {}
     required_fields = schema.get("required", [])
-
     field_map = {f["id"]: f["title"] for f in required_fields}
     missing_required = [
         f["id"] for f in required_fields
-        if f["id"] not in collected
+        if not _is_filled(collected.get(f["id"]))
     ]
 
     if missing_required:
-        missing_titles = [
-            field_map.get(field_id, field_id)
-            for field_id in missing_required
-        ]
+        missing_titles = [field_map.get(field_id, field_id) for field_id in missing_required]
         response_message = (
             "Для формирования договора необходимо указать:\n\n"
             + "\n".join(f"- {title}" for title in missing_titles)
@@ -172,6 +193,7 @@ async def contract_generator_intake_validation_node(state) -> Dict[str, Any]:
         logger.debug(f"Response to user: {response_message}")
 
         return {
+            **base,
             "validation_errors": missing_required,
             "is_valid": False,
             "response_to_user": response_message,
@@ -179,6 +201,7 @@ async def contract_generator_intake_validation_node(state) -> Dict[str, Any]:
 
     logger.debug("Validation passed")
     return {
+        **base,
         "validation_errors": [],
         "is_valid": True,
         "response_to_user": None,

@@ -33,6 +33,11 @@ class AgentService:
             "credentials": os.getenv("SBER_AUTH"),
             **DEFAULT_GIGACHAT_PARAMS
         }
+        contract_generator_kwargs = {
+            "credentials": os.getenv("SBER_AUTH"),
+            **DEFAULT_GIGACHAT_PARAMS,
+            "max_tokens":500
+        }
         general_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
             **DEFAULT_GIGACHAT_PARAMS
@@ -40,10 +45,11 @@ class AgentService:
 
         router_llm = create_gigachat("GigaChat", **router_kwargs)
         contract_llm = create_gigachat("GigaChat", **contract_kwargs)
+        contract_generator_llm = create_gigachat("GigaChat", **contract_generator_kwargs)
         general_llm = create_gigachat("GigaChat", **general_kwargs)
 
         self.router_agent = RouterGraphAgent(router_llm)
-        self.contract_agent = ContractGraphAgent(contract_llm)
+        self.contract_agent = ContractGraphAgent(contract_llm, generator_llm=contract_generator_llm)
         self.general_agent = GeneralQuestionsGraphAgent(general_llm)
         logger.info("AgentService инициализирован успешно")
 
