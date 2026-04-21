@@ -9,8 +9,8 @@ from functools import lru_cache
 from langchain_gigachat import GigaChat
 from langchain_core.messages import BaseMessage
 
-from app.core.config import get_settings
-from app.utils.logger import get_logger
+from claims_agent.config import get_settings
+from claims_agent.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -26,13 +26,14 @@ def get_llm() -> GigaChat:
         verify_ssl_certs=s.gigachat_verify_ssl,
         temperature=s.gigachat_temperature,
         max_tokens=s.gigachat_max_tokens,
+        timeout=s.gigachat_timeout,
     )
 
 
 def invoke_llm(
     messages: list[BaseMessage],
     *,
-    max_retries: int = 3,
+    max_retries: int = 2,
     backoff: float = 2.0,
 ) -> str:
     """

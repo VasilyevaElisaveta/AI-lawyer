@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     gigachat_verify_ssl: bool = False
     gigachat_temperature: float = 0.1
     gigachat_max_tokens: int = 8192
+    gigachat_timeout: int = 180
 
     # ── Пути ──────────────────────────────────────────────────
     vector_db_path: str = "data/vector_store"

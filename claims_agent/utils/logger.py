@@ -19,7 +19,7 @@ def get_logger(name: str) -> logging.Logger:
 
     # уровень задаётся через config, но здесь — безопасный импорт
     try:
-        from app.core.config import get_settings
+        from claims_agent.config import get_settings
         logger.setLevel(get_settings().log_level)
     except Exception:
         logger.setLevel(logging.INFO)
