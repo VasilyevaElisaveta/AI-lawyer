@@ -36,14 +36,19 @@ class MessageObject(BaseModel):
     files: list[FileObject]
 
 
-class MessagesResponseModel(BaseModel):
+class AllMessagesResponseModel(BaseModel):
 
     messages: list[MessageObject]
 
 
-class OneMessageModel(BaseModel):
+class OneMessageRequestModel(BaseModel):
 
     message: str
+
+
+class OneMessageResponseModel(BaseModel):
+
+    message: MessageObject
 
 
 class RatingModel(BaseModel):

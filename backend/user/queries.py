@@ -6,10 +6,10 @@ from db.DatabaseModels import User
 class Queries:
 
     @staticmethod
-    def create_user_query(username: str, email: str, hashed_password: str, name: str, surname: str, patronymic: str):
+    def create_user_query(username: str, email: str, hashed_password: str, name: str, surname: str, patronymic: str | None=None, is_admin: bool=False):
         query = (
             insert(User)
-            .values(username=username, email=email, password=hashed_password, name=name, surname=surname, patronymic=patronymic)
+            .values(username=username, email=email, password=hashed_password, name=name, surname=surname, patronymic=patronymic, is_admin=is_admin)
             .returning(User.name, User.surname, User.patronymic, User.username, User.email)
         )
         return query

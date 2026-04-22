@@ -65,7 +65,6 @@ class Message(Base):
     text: Mapped[str]
     role: Mapped[ChatRole]
     rating: Mapped[int | None]
-    attachments_amount: Mapped[int] = mapped_column(default=0)
     sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))
 
 

@@ -4,12 +4,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pwdlib import PasswordHash
 from argparse import ArgumentParser
+from dotenv import load_dotenv
+from os import getenv
 
+from user.queries import Queries
 from user.endpoints import user_router
 from chat.endpoints import chat_router
 # from documents.endpoints import documents_router
 # from statistics.endpoints import statistics_router
 from db.Database import Database
+
+
+load_dotenv()
 
 
 V1_PREFIX = "/api/v1"
@@ -30,6 +36,30 @@ async def lifespan(app: FastAPI):
 
     if reset:
         await app.state.db.reset()
+
+    admin_username = getenv("admin_username")
+
+    if admin_username is not None:
+        admin = await app.state.db.exec_query(Queries.get_user_query(admin_username))
+
+        if admin is None:
+            admin_email = getenv("admin_email")
+            admin_password = getenv("admin_password")
+            admin_name = getenv("admin_name")
+            admin_surname = getenv("admin_surname")
+
+            admin_password_hash = app.state.password_hash.hash(admin_password)
+
+            await app.state.db.exec_query(
+                Queries.create_user_query(
+                    username=admin_username,
+                    email=admin_email,
+                    hashed_password=admin_password_hash,
+                    name=admin_name,
+                    surname=admin_surname,
+                    is_admin=True
+                    )
+                )
 
     yield
 
