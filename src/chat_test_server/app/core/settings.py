@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     app_name: str = "chat-test-service"
     api_v1_prefix: str = "/api/v1"
 
-    agent_base_url: str = "http://agent:8000"
-    agent_chat_path: str = "/chat"
+    agent_base_url: str = "http://inference-server:8000"
+    agent_chat_path: str = "/api/chat/invoke"
     agent_timeout_seconds: float = 120.0
 
 

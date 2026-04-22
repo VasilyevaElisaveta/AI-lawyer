@@ -1,12 +1,16 @@
 from collections.abc import AsyncIterator
-from typing import Any
+from uuid import uuid4
 import httpx
+import logging
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 
 class InferenceResponse(BaseModel):
-    reply_text: str
-    document: str | None = None
+    reply: str
+    handled_by_agent: bool
+    document_created: bool
 
 
 class AgentClient:
@@ -25,18 +29,27 @@ class AgentClient:
         message: str,
         conversation_id: str | None = None
     ) -> InferenceResponse:
-
-        payload: dict[str, Any] = {"message": message}
-        if conversation_id:
-            payload["conversation_id"] = conversation_id
+        payload = {
+            "raw_input": message,
+            "thread_id": conversation_id or str(uuid4()),
+            "agent_type": None,
+        }
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.post(self.url, json=payload)
+            if response.status_code >= 400:
+                logger.error("HTTP %s from %s", response.status_code, self.url)
+                logger.error("Request payload: %s", payload)
+                logger.error("Response body: %s", response.text)
+
             response.raise_for_status()
 
-            data = response.json()
-
-        return InferenceResponse.model_validate(data)
+            response_data = response.json()
+            return InferenceResponse(
+                reply=response_data.get("reply", ""),
+                handled_by_agent=response_data.get("handled_by_agent", True),
+                document_created=response_data.get("document_created", False),
+            )
 
     async def stream_message(
         self,
