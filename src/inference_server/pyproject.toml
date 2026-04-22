@@ -1,0 +1,48 @@
+[project]
+name = "ai-lawyer-inference-server"
+version = "1.0.0"
+description = "Inference server for AI Lawyer agents"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    # FastAPI и http
+    "fastapi[standard]>=0.135.1",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    
+    # LLM и агенты
+    "langgraph>=0.1.0",
+    "langchain>=0.1.0",
+    "langchain-gigachat>=0.0.1",
+    "langchain-core>=0.1.0",
+    
+    # Утилиты
+    "python-dotenv>=1.2.0",
+    "aiohttp>=3.9.0",
+    
+    # Документы
+    "python-docx>=0.8.11",
+    
+    # Логирование и мониторинг
+    "python-json-logger>=2.0.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["src.inference_server*"]
+exclude = ["logs*"]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"

@@ -1,34 +1,37 @@
+import inspect
 import os
+from dotenv import load_dotenv
 
 from langchain_gigachat import GigaChat
-from langchain_core.messages import BaseMessage
-from dotenv import load_dotenv
+
 
 load_dotenv()
 
-SBER_AUTH = os.getenv("SBER_AUTH")
+DEFAULT_GIGACHAT_PARAMS = {
+    "profanity_check": False,
+    "verify_ssl_certs": False,
+    "top_p": 0.1,
+    "max_tokens": 128,
+    "timeout": 120,
+}
 
-class GigaChatClient:
-    def __init__(
-        self,
-        model: str = "GigaChat",
-        temperature: float = 0.0,
-    ) -> None:
-        credentials = SBER_AUTH or os.getenv("SBER_AUTH")
-        if not credentials:
-            raise RuntimeError("Environment variable SBER_AUTH is required for GigaChatClient")
 
-        self.client = GigaChat(
-            credentials=credentials,
-            model=model,
-            profanity_check=False,
-            verify_ssl_certs=False,
-            temperature=temperature,
-            top_p=0.1,
-            max_tokens=128,
-            timeout=120,
-        )
+def create_gigachat(
+    model: str,
+    temperature: float | None = None,
+    **kwargs,
+) -> GigaChat:
+    params = {
+        "model": model or os.getenv("LLM_MODEL", "GigaChat"),
+        **kwargs,
+    }
 
-    async def ainvoke(self, messages: list[BaseMessage]) -> str:
-        response = await self.client.ainvoke(messages)
-        return getattr(response, "content", str(response))
+    if temperature is not None:
+        params["temperature"] = temperature
+
+    allowed = set(inspect.signature(GigaChat).parameters)
+    unknown = set(params) - allowed
+    if unknown:
+        raise TypeError(f"Unsupported GigaChat arguments: {sorted(unknown)}")
+
+    return GigaChat(**params)

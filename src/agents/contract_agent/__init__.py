@@ -1,4 +1,4 @@
 from .graph import ContractAgent
-from .state import AgentState
+from .state import ContractAgentState
 
-__all__ = ["ContractAgent", "AgentState"]
+__all__ = ["ContractAgent", "ContractAgentState"]

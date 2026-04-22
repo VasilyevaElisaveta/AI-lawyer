@@ -1,8 +1,6 @@
 import json
 import re
-from typing import Any, Dict
-
-from .fields import REQUIRED_FIELDS_BY_TYPE
+from typing import Any, Dict, List
 
 
 def render_template(template: str, variables: Dict[str, Any]) -> str:
@@ -13,46 +11,16 @@ def render_template(template: str, variables: Dict[str, Any]) -> str:
     return template.format_map(_SafeDict(variables))
 
 
-def format_amount(value: Any) -> str:
-    if value is None or value == "":
+def normalize_braces(text: str) -> str:
+    return text.replace("{{", "{").replace("}}", "}")
+
+
+def _normalize_space(value: Any) -> str:
+    if value is None:
         return ""
-    if isinstance(value, bool):
-        return "Да" if value else "Нет"
-
-    try:
-        if isinstance(value, str):
-            value = float(value.replace(",", ".")) if re.search(r"\d", value) else value
-        if isinstance(value, (int, float)):
-            if float(value).is_integer():
-                return f"{int(value):,}".replace(",", " ")
-            return f"{value:,.2f}".replace(",", " ")
-    except ValueError:
-        return str(value)
-
-    return str(value)
-
-
-def build_qa_context(state: dict[str, Any]) -> str:
-    data = {}
-    for k, v in state.items():
-        if v is None or v == "":
-            continue
-        if k == "messages":
-            # Конвертируем сообщения в строки для JSON
-            data[k] = [f"{msg.type}: {msg.content}" for msg in v]
-        else:
-            data[k] = v
-    return json.dumps(data, ensure_ascii=False, indent=2)
-
-
-def find_missing_required_fields(state: Dict[str, Any], field_name: str) -> list[str]:
-    required = REQUIRED_FIELDS_BY_TYPE.get(field_name, [])
-    missing: list[str] = []
-    for key in required:
-        value = state.get(key)
-        if value is None or (isinstance(value, str) and not value.strip()):
-            missing.append(key)
-    return missing
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, indent=2)
+    return str(value).strip()
 
 
 def _parse_json(text: str) -> dict:
@@ -70,6 +38,7 @@ def _parse_json(text: str) -> dict:
 
 
 def safe_parse_json(text: str) -> dict[str, Any]:
+    text = normalize_braces(text)
     try:
         return _parse_json(text)
     except Exception:
@@ -80,3 +49,50 @@ def safe_parse_json(text: str) -> dict[str, Any]:
             except json.JSONDecodeError:
                 return {}
         return {}
+    
+
+def messages_to_str(messages) -> str:
+    role_map = {
+        "human": "User",
+        "ai": "Assistant",
+        "system": "System"
+    }
+
+    formatted_messages = []
+
+    for msg in messages:
+        # Handle both dict and BaseMessage objects
+        if hasattr(msg, 'type') and hasattr(msg, 'content'):
+            # BaseMessage object
+            role = role_map.get(msg.type, msg.type)
+            content = msg.content.strip()
+        elif isinstance(msg, dict):
+            # Dict object
+            role = role_map.get(msg.get("type", ""), msg.get("type", "unknown"))
+            content = msg.get("content", "").strip()
+        else:
+            # Unknown type
+            role = "unknown"
+            content = str(msg).strip()
+
+        if not content:
+            continue
+
+        formatted_messages.append(f"{role}: {content}")
+
+    return "\n".join(formatted_messages)
+
+
+def documents_to_str(documents: List[str]) -> str:
+    formatted_messages = []
+    for i, document in enumerate(documents):
+        formatted_messages.append(f"{i}: ")
+        formatted_messages.append(document)
+    return "\n".join(formatted_messages)
+
+
+def safe_parse_list_int(output: str) -> List[int]:
+    if not output:
+        return []
+    numbers = re.findall(r'-?\d+', output)
+    return [int(n) for n in numbers]

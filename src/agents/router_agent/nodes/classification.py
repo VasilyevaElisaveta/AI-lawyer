@@ -1,20 +1,30 @@
 from typing import Any, Dict
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnableConfig
 
-from ..state import RouterAgentState
-from ..prompts import (
+from .prompts import (
     ROUTER_CLASSIFICATION_SYSTEM,
     ROUTER_CLASSIFICATION_PROMPT,
     CATEGORY_NOT_IMPLEMENTED,
     CLASSIFICATION_ERROR,
 )
 
-from ...llm_client import GigaChatClient
+from ..state import RouterAgentState
+
 from ...utils import safe_parse_json, render_template
 
+from ....utils import LoggerFactory
 
-async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> Dict[str, Any]:
+logger = LoggerFactory.get_logger("RouterAgentClassificationNode")
+
+
+async def classification_node(
+        state: RouterAgentState, 
+        llm, 
+        previous_node: str | None = None,
+        config: RunnableConfig | None = None
+) -> Dict[str, Any]:
     """
     Узел классификации: определяет категорию запроса пользователя.
     
@@ -22,29 +32,40 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
     - contract (договоры)
     - lawsuit (иски)
     - pretrial_claim (досудебные претензии)
-    - simple_question (простые вопросы)
+    - general_question (простые вопросы)
     
     Возвращает обновлённое состояние с результатом классификации.
     """
-    user_message = state.get("raw_input", "")
+    logger.info("Start...")
+    raw_input = state.get("raw_input", "")
     
-    if not user_message:
+    if not raw_input:
         return {
             "error_message": "Не получено сообщение пользователя",
             "reply": "Ошибка: пустой запрос",
             "routed_to": "none",
         }
     
-    # Подготавливаем промпт
-    prompt = render_template(ROUTER_CLASSIFICATION_PROMPT, {"user_message": user_message})
+    if previous_node is not None:
+        return {
+            "routed_to": previous_node,
+            "reply": "",
+        }
     
-    # Вызываем LLM для классификации
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", ROUTER_CLASSIFICATION_SYSTEM),
+        ("human", ROUTER_CLASSIFICATION_PROMPT)
+    ])
+    
+    chain = prompt | llm
     try:
-        response = await llm.ainvoke([
-            SystemMessage(content=ROUTER_CLASSIFICATION_SYSTEM),
-            HumanMessage(content=prompt),
-        ])
-        classification_result = safe_parse_json(response)
+        response = await chain.ainvoke({
+            "raw_input": raw_input
+        },
+        config=config
+        )
+        raw = response.content
+        classification_result = safe_parse_json(raw)
     except Exception as e:
         return {
             "error_message": f"Ошибка при классификации: {str(e)}",
@@ -52,7 +73,6 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
             "routed_to": "none",
         }
     
-    # Проверяем результат классификации
     if not classification_result or "category" not in classification_result:
         return {
             "error_message": "LLM вернул некорректный результат классификации",
@@ -60,11 +80,11 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
             "routed_to": "none",
         }
     
-    category = classification_result.get("category", "simple_question")
+    category = classification_result.get("category", "general_question")
     confidence = classification_result.get("confidence", 0.0)
     
     # Определяем, реализован ли обработчик для этой категории
-    implemented_categories = {"contract", "simple_question"}
+    implemented_categories = {"contract"}
     is_implemented = category in implemented_categories
     
     # Подготавливаем результат
@@ -79,9 +99,9 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
     if is_implemented:
         result["routed_to"] = {
             "contract": "contract_agent",
-            "simple_question": "simple_question_agent",
+            "general_question": "general_questions_agent",
         }.get(category, "none")
-        result["reply"] = ""  # Пусто, будет заполнено в маршрутизаторе
+        result["reply"] = ""
     else:
         # Категория не реализована
         result["routed_to"] = "none"
@@ -90,5 +110,9 @@ async def classification_node(state: RouterAgentState, llm: GigaChatClient) -> D
             CATEGORY_NOT_IMPLEMENTED,
             {"category": category}
         )
-    
+    logger.debug(
+        f"Got result\n" \
+        f"routed to: {result["routed_to"]}"
+    )
+    logger.info("Finish")
     return result
