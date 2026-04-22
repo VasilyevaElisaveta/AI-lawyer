@@ -10,7 +10,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     conversation_id: UUID
     message: str
-    reply: str | None = None
-    document_created: bool = False
+    reply: str
+    document_created: bool
     document_bytes: bytes | None = None
     document_filename: str | None = None

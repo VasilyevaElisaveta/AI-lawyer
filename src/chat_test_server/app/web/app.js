@@ -49,12 +49,13 @@ async function sendMessage() {
 
     const contentType = (response.headers.get("content-type") || "").toLowerCase();
 
-    if (contentType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
-      if (!response.ok) {
-        addMessage("Ошибка при получении документа.", "bot");
-        return;
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      addMessage(`Ошибка: ${errorText}`, "bot");
+      return;
+    }
 
+    if (contentType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml.document")) {
       const blob = await response.blob();
       downloadBlob(blob, `${conversationId || "document"}.docx`);
       addMessage("Документ готов. Скачивание началось.", "bot");
@@ -62,11 +63,6 @@ async function sendMessage() {
     }
 
     const data = await response.json();
-
-    if (!response.ok) {
-      addMessage(`Ошибка: ${data.detail || "неизвестная ошибка"}`, "bot");
-      return;
-    }
 
     conversationId = data.conversation_id;
     addMessage(data.reply || "(пустой ответ)", "bot");

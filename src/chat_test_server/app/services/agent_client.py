@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 class InferenceResponse(BaseModel):
     reply: str
-    handled_by_agent: bool = True
-    document_created: bool = False
+    handled_by_agent: bool
+    document_created: bool
 
 
 class AgentClient:

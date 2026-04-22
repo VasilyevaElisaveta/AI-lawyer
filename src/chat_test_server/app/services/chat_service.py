@@ -18,20 +18,25 @@ class ChatService:
         )
 
         raw = (inference_reply.reply or "").strip()
-        is_docx = raw.startswith("UEsDB")
-        if is_docx:
+
+        if inference_reply.document_created:
             raw = raw.replace("\n", "").replace("\r", "")
             document_bytes = base64.b64decode(raw)
+
             return ChatResponse(
                 conversation_id=conversation_id,
                 message=request.message,
+                reply="",
                 document_created=True,
                 document_bytes=document_bytes,
                 document_filename=f"{conversation_id}.docx",
             )
+
         return ChatResponse(
             conversation_id=conversation_id,
             message=request.message,
             reply=inference_reply.reply,
             document_created=False,
+            document_bytes=None,
+            document_filename=None,
         )

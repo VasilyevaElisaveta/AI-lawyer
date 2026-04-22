@@ -1,7 +1,5 @@
-from io import BytesIO
-
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi import APIRouter, Depends, Request, Response
+from fastapi.responses import JSONResponse
 
 from ....schemas.chat import ChatRequest, ChatResponse
 from ....services.chat_service import ChatService
@@ -33,8 +31,8 @@ async def send_chat_message(
             "X-Document-Created": "true",
         }
 
-        return StreamingResponse(
-            BytesIO(result.document_bytes),
+        return Response(
+            content=result.document_bytes,
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             headers=headers,
         )
