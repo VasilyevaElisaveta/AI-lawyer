@@ -15,8 +15,6 @@ services:
       - LLM_MODEL=GigaChat
       - SBER_AUTH=${SBER_AUTH:-}
       - DEBUG=False
-    volumes:
-      - ./logs:/app/logs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/chat/health"]
       interval: 30s

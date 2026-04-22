@@ -9,6 +9,10 @@ def _clear_previous_run_results(state):
     state["document_ids"] = []
     state["decision"] = {}
     state["response_to_user"] = None
+    state["generated_docx_base64"] = None
+    state["response_to_user"] = None
+    state["markdown_generation_attempts"] = 0
+    state["document_created"] = False
     logger.info("Previous run results cleared")
 
 

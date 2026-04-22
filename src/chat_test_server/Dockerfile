@@ -5,12 +5,12 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY pyproject.toml /app/
-COPY app /app/app
+COPY src/chat_test_server/requirements.txt ./
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install -r requirements.txt
 
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir .
+COPY . /app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.chat_test_server.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

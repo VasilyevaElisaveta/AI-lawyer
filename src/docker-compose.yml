@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  inference-server:
+    env_file:
+      - inference_server/.env
+    build:
+      context: ..
+      dockerfile: src/inference_server/Dockerfile
+    container_name: ai-lawyer-inference-server
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/chat/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - ai-lawyer-network
+
+  chat-frontend:
+    env_file:
+      - chat_test_server/.env
+    build:
+      context: ..
+      dockerfile: src/chat_test_server/Dockerfile
+    container_name: ai-lawyer-chat
+    ports:
+      - "8000:8000"
+    depends_on:
+      inference-server:
+        condition: service_healthy
+    networks:
+      - ai-lawyer-network
+
+networks:
+  ai-lawyer-network:
+    driver: bridge
