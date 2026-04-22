@@ -1,6 +1,20 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy import Column, DateTime, ForeignKey
 from datetime import datetime, timezone
+from uuid import uuid4
+from sqlalchemy.dialects.postgresql import UUID
+from enum import StrEnum
+
+
+MAX_ATTACHMENTS_AMOUNT = 3
+MAX_MESSAGE_RATING = 5
+MIN_MESSAGE_RATING = 1
+
+
+class ChatRole(StrEnum):
+
+    USER = "human"
+    AI = "ai"
 
 
 class Base(DeclarativeBase):
@@ -22,57 +36,53 @@ class User(Base):
     patronymic: Mapped[str | None]
 
 
-class Chats(Base):
+class Chat(Base):
 
     __tablename__ = "chats"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    name: Mapped[str]
+    name: Mapped[str | None]
+    appeal_type: Mapped[str | None]
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))
 
 
-class ChatSummaries(Base):
+class ChatSummary(Base):
     
-    __tablename__ = "chat_sumaries"
+    __tablename__ = "chat_summaries"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     summary: Mapped[str]
 
 
-class UserMessages(Base):
+class Message(Base):
 
-    __tablename__ = "user_messages"
+    __tablename__ = "messages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
     text: Mapped[str]
-    attachment_1: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
-    attachment_2: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
-    attachment_3: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
+    role: Mapped[ChatRole]
+    rating: Mapped[int | None]
+    attachments_amount: Mapped[int] = mapped_column(default=0)
     sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))
 
 
-class ModelMessages(Base):
+class Attachment(Base):
 
-    __tablename__ = "model_messages"
-    
+    __tablename__ = "attachments"
+
     id: Mapped[int] = mapped_column(primary_key=True)
-    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
-    text: Mapped[str]
-    rating: Mapped[int] = mapped_column(nullable=True)
-    attachment_1: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
-    attachment_2: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
-    attachment_3: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="SET NULL"), nullable=True)
-    sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"))
+    file_id: Mapped[int] = mapped_column(ForeignKey("files.id", ondelete="CASCADE"))
 
 
-class Files(Base):
+class File(Base):
 
     __tablename__ = "files"
     
     id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="SET NULL"), nullable=True)
     path: Mapped[str]

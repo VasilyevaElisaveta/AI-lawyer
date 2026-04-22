@@ -6,6 +6,9 @@ from pwdlib import PasswordHash
 from argparse import ArgumentParser
 
 from user.endpoints import user_router
+from chat.endpoints import chat_router
+# from documents.endpoints import documents_router
+# from statistics.endpoints import statistics_router
 from db.Database import Database
 
 
@@ -19,10 +22,11 @@ async def lifespan(app: FastAPI):
     parser.add_argument("--sync", action="store_true")
     parser.add_argument("--reset", action="store_true")
     parser.add_argument("--detail", action="store_true")
+    parser.add_argument("--temp", action="store_true")
     args = parser.parse_args()
-    is_sync, reset, detail = args.sync, args.reset, args.detail
+    is_sync, reset, detail, is_temp = args.sync, args.reset, args.detail, args.temp
 
-    app.state.db = Database(is_sync=is_sync, detail=detail)
+    app.state.db = Database(is_sync=is_sync, is_temp=is_temp, detail=detail)
 
     if reset:
         await app.state.db.reset()
@@ -51,6 +55,9 @@ app.add_middleware(
 )
 
 app.include_router(user_router, prefix=V1_PREFIX)
+app.include_router(chat_router, prefix=V1_PREFIX)
+# app.include_router(documents_router, prefix=V1_PREFIX)
+# app.include_router(statistics_router, prefix=V1_PREFIX)
 
 
 if __name__ == "__main__":

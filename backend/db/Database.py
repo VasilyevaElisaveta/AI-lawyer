@@ -12,7 +12,7 @@ class Database:
     __SYNC_PATH_BASE = "sqlite:///"
     __ASYNC_PATH_BASE = "postgresql+asyncpg://"
 
-    def __init__(self, is_sync: bool=True, detail: bool=False, is_temp: bool=False):
+    def __init__(self, is_sync: bool=True, is_temp: bool=False, detail: bool=False):
         self.__is_sync = is_sync
         self.__is_temp = is_temp
         if self.__is_sync:
@@ -69,77 +69,17 @@ class Database:
                 result = result.mappings().all()
             await session.commit()
             return result
-
-    async def __exec_query(self, query, returning: bool=True):
+        
+    async def exec_query(self, query, returning: bool=True, one_or_none: bool=True):
         if self.__is_sync:
-            return self.__exec_sync(query, returning)
-        return await self.__exec_async(query, returning)
-    
-    async def create_object(self, object):
-        if self.__is_sync:
-            return self.__create_sync(object)
+            result = self.__exec_sync(query, returning)
         else:
-            return self.__create_async(object)
-
-    def __create_sync(self, object):
-        with self.__session() as session:
-            session.add(object)
-            session.commit()
-            session.refresh(object)
-            return object
-
-    async def __create_async(self, object):
-        async with self.__session() as session:
-            session.add(object)
-            await session.commit()
-            await session.refresh(object)
-            return object
-    
-    @staticmethod
-    def __get_user_query(value: str, by_username: bool):
-        query = select(User.id, User.name, User.surname, User.patronymic, User.username, User.email, User.password).select_from(User)
-        if by_username:
-            query = query.filter_by(username=value)
+            result = await self.__exec_async(query, returning)
+        
+        if not returning:
+            return
+        
+        if one_or_none:
+            return result[0] if len(result) != 0 else None
         else:
-            query = query.filter_by(email=value)
-        return query
-    
-    @staticmethod
-    def __get_update_user_query(user_id: int, new_user_data: dict):
-        query = (update(User)
-                 .filter_by(id=user_id)
-                 .values(**new_user_data)
-                 .returning(User.name, User.surname, User.patronymic, User.username, User.email))
-        return query
-    
-    @staticmethod
-    def __get_change_password_query(user_id: int, new_password: str):
-        query = update(User).filter_by(id=user_id).values(password=new_password)
-        return query
-    
-    @staticmethod
-    def __get_delete_user_query(user_id: int):
-        query = delete(User).filter_by(id=user_id)
-        return query
-    
-    async def create_user(self, username: str, email: str, password: str, name: str, surname: str, patronymic: str | None):
-        new_user = User(username=username, email=email, password=password, name=name, surname=surname, patronymic=patronymic)
-        return await self.create_object(new_user)
-    
-    async def get_user(self, value: str, by_username: bool=True):
-        query = Database.__get_user_query(value, by_username)
-        result = await self.__exec_query(query)
-        return result[0] if len(result) != 0 else None
-    
-    async def update_user_info(self, user_id: int, new_user_data: dict):
-        query = Database.__get_update_user_query(user_id, new_user_data)
-        updated_user = await self.__exec_query(query)
-        return updated_user[0]
-    
-    async def change_password(self, user_id: int, new_password: str):
-        query = Database.__get_change_password_query(user_id, new_password)
-        await self.__exec_query(query)
-
-    async def delete_user(self, user_id: int):
-        query = Database.__get_delete_user_query(user_id)
-        await self.__exec_query(query, returning=False)
+            return result
