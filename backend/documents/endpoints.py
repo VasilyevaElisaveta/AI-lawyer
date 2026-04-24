@@ -1,25 +1,51 @@
-from typing import Annotated
-from fastapi import APIRouter, Form, Body, Depends, status, HTTPException
+from fastapi import APIRouter, status, HTTPException
+from fastapi.responses import FileResponse
+from pathlib import Path
 
-from db.Database import Database
-
-from dependencies.dependencies import get_current_user, get_password_hash, get_database
-
+from documents.queries import Queries
+from documents.RequestModels import DocumentsResponse
+from dependencies.dependencies import CurrentUser, AppDatabase
 
 
 documents_router = APIRouter(prefix="/documents", tags=["documnts"])
 
 
-@documents_router.get("/")
-async def get_documents():
-    pass
+@documents_router.get("/",
+                      description="Get user files.",
+                      response_model=DocumentsResponse,
+                      status_code=status.HTTP_200_OK)
+async def get_documents(user: CurrentUser, db: AppDatabase):
+    documents = await db.exec_query(Queries.get_user_documents_query(user.id), one_or_none=False)
+    return {"documents": documents}
 
 
-@documents_router.get("/{document_id}/")
-async def get_document(document_id: int):
-    pass
+@documents_router.get("/{document_id}/",
+                      description="Download document.",
+                      response_class=FileResponse,
+                      status_code=status.HTTP_200_OK)
+async def get_document(document_id: int, user: CurrentUser, db: AppDatabase):
+    document = await db.exec_query(Queries.get_document(document_id))
+    if document is None or document.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+    
+    if not Path(document.path).exists():
+        await db.exec_query(Queries.delete_document(document_id), returning=False)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+    
+    return FileResponse(
+        path=document.path,
+        filename=document.name,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
 
 
-@documents_router.delete("/{document_id}/")
-async def delete_document(document_id: int):
-    pass
+@documents_router.delete("/{document_id}/",
+                         description="Delete document.",
+                         status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document(document_id: int, user: CurrentUser, db: AppDatabase):
+    document = await db.exec_query(Queries.get_document(document_id))
+    if document is None or document.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
+    
+    Path(document.path).unlink(missing_ok=True)
+    await db.exec_query(Queries.delete_document(document_id), returning=False)

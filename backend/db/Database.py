@@ -1,11 +1,12 @@
 from os import getenv
 from tempfile import TemporaryDirectory
 
-from sqlalchemy import create_engine, select, update, delete
+from sqlalchemy import create_engine, event
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
+from sqlite3 import Connection
 
-from db.DatabaseModels import Base, User
+from db.DatabaseModels import Base
 
 
 class Database:
@@ -26,6 +27,14 @@ class Database:
                 url,
                 echo=detail
             )
+
+            @event.listens_for(self.__engine, "connect")
+            def set_sqlite_pragma(dbapi_connection, connection_record):
+                if isinstance(dbapi_connection, Connection):
+                    cursor = dbapi_connection.cursor()
+                    cursor.execute("PRAGMA foreign_keys=ON")
+                    cursor.close()
+            
             self.__session = sessionmaker(self.__engine)
         else:
             user = getenv("POSTGRES_USER", "<Postgres user>")

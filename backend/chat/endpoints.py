@@ -64,6 +64,7 @@ async def get_chat_messages(chat_id: UUID, user: CurrentUser, db: AppDatabase,
                 "id": row.id,
                 "text": row.text,
                 "role": row.role,
+                "rating": row.rating,
                 "files": [],
             }
         if row.file_id is not None:
@@ -99,13 +100,17 @@ async def send_message(chat_id: UUID, data: Annotated[OneMessageRequestModel, Fo
         storage_dir = Path(getenv("storage_path", "storage"))
         storage_dir.mkdir(exist_ok=True)
         
-        document_name = f"{uuid4()}.docx"
-        document_path = f"{storage_dir}/{document_name}"
+        user_storage_dir = storage_dir / Path(user.username)
+        user_storage_dir.mkdir(exist_ok=True)
+        
+        document_user_name = data.message
+        document_system_name = f"{uuid4()}.docx"
+        document_path = str(user_storage_dir / document_system_name)
         document = Document()
         document.add_paragraph(model_answer)
         document.save(document_path)
 
-        file = await db.exec_query(Queries.create_file_query(document_name, user.id, document_path))
+        file = await db.exec_query(Queries.create_file_query(document_user_name, user.id, chat_id, document_path))
         await db.exec_query(Queries.add_attachment_query(message["id"], file.id), returning=False)
 
         message["files"] = await db.exec_query(Queries.get_files_query(message["id"]), one_or_none=False)

@@ -33,6 +33,7 @@ class MessageObject(BaseModel):
     id: int
     text: str
     role: str
+    rating: int | None
     files: list[FileObject]
 
 

@@ -65,6 +65,9 @@ class Message(Base):
     text: Mapped[str]
     role: Mapped[ChatRole]
     rating: Mapped[int | None]
+    agent_type: Mapped[str | None]
+    used_tokens: Mapped[int| None]
+    processing_time: Mapped[int | None]
     sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))
 
 
@@ -84,4 +87,5 @@ class File(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str]
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    chat_id: Mapped[UUID | None] = mapped_column(ForeignKey("chats.id", ondelete="SET NULL"))
     path: Mapped[str]

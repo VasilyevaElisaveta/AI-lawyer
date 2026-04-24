@@ -34,6 +34,7 @@ class Queries:
                 Message.id,
                 Message.text,
                 Message.role,
+                Message.rating,
                 File.id.label("file_id"),
                 File.name.label("file_name"),
             )
@@ -58,13 +59,13 @@ class Queries:
         query = (
             insert(Message)
             .values(chat_id=chat_id, text=text, role=role)
-            .returning(Message.id, Message.text, Message.role)
+            .returning(Message.id, Message.text, Message.role, Message.rating)
         )
         return query
     
     @staticmethod
-    def create_file_query(name: str, user_id: int, path: str):
-        query = insert(File).values(name=name, user_id=user_id, path=path).returning(File.id)
+    def create_file_query(name: str, user_id: int, chat_id: UUID, path: str):
+        query = insert(File).values(name=name, user_id=user_id, chat_id=chat_id, path=path).returning(File.id)
         return query
     
     @staticmethod
