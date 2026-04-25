@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from datetime import datetime
 
 
 class DocumentObject(BaseModel):
@@ -6,8 +7,9 @@ class DocumentObject(BaseModel):
     id: int
     file_name: str
     chat_name: str | None
+    created_at: datetime
 
 
-class DocumentsResponse(BaseModel):
+class DocumentsResponseModel(BaseModel):
 
     documents: list[DocumentObject]

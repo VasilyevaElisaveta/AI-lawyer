@@ -89,13 +89,18 @@ async def send_message(chat_id: UUID, data: Annotated[OneMessageRequestModel, Fo
         appeal_type = f"appeal {datetime.now().time()}"
         await db.exec_query(Queries.add_chat_name_and_appeal_type_query(chat_id, name, appeal_type), returning=False)
     
-    await db.exec_query(Queries.add_message_to_chat_query(chat_id, data.message, "human"))
+    human_message = await db.exec_query(Queries.add_message_to_chat_query(chat_id, data.message, "human"))
 
     # AI template
+    from random import randint, choice
+    tokens = randint(100, 500)
+    processing_time = randint(0, 100)
+    agent = choice(["contract", "lawsuit", "pretrial_claim", "general_question"])
     model_answer = f"Пользователь написал: {data.message}"
-    message = await db.exec_query(Queries.add_message_to_chat_query(chat_id, model_answer, "ai"))
-    message = dict(message)
+    ai_message = await db.exec_query(Queries.add_message_to_chat_query(chat_id, model_answer, "ai", agent, tokens, processing_time))
+    await db.exec_query(Queries.add_message_reply_query(human_message.id, ai_message.id), returning=False)
 
+    ai_message = dict(ai_message)
     if data.message == "Напиши документ":
         storage_dir = Path(getenv("storage_path", "storage"))
         storage_dir.mkdir(exist_ok=True)
@@ -111,13 +116,13 @@ async def send_message(chat_id: UUID, data: Annotated[OneMessageRequestModel, Fo
         document.save(document_path)
 
         file = await db.exec_query(Queries.create_file_query(document_user_name, user.id, chat_id, document_path))
-        await db.exec_query(Queries.add_attachment_query(message["id"], file.id), returning=False)
+        await db.exec_query(Queries.add_attachment_query(ai_message["id"], file.id), returning=False)
 
-        message["files"] = await db.exec_query(Queries.get_files_query(message["id"]), one_or_none=False)
+        ai_message["files"] = await db.exec_query(Queries.get_files_query(ai_message["id"]), one_or_none=False)
     else:
-        message["files"] = []
+        ai_message["files"] = []
 
-    return {"message": message}
+    return {"message": ai_message}
     
 
 @chat_router.post("/{chat_id}/message/{message_id}/rate/",

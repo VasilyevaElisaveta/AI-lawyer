@@ -16,7 +16,7 @@ class Queries:
 
     @staticmethod
     def get_user_query(value: str, by_username: bool=True):
-        query = select(User.id, User.name, User.surname, User.patronymic, User.username, User.email, User.password).select_from(User)
+        query = select(User.id, User.name, User.surname, User.patronymic, User.username, User.email, User.password, User.is_admin).select_from(User)
         if by_username:
             query = query.filter_by(username=value)
         else:

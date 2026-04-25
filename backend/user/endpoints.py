@@ -5,8 +5,8 @@ from user.tokenService import TokenService
 from user.queries import Queries
 from user.RequestModels import (RegistrationRequestModel, LoginRequestModel,
                                 UserResponseModel, TokensResponseModel,
-                                RefreshTokensRequest, UpdateInfoRequestModel,
-                                ChangePasswordRequestModel, DeleteUserRequest)
+                                RefreshTokensRequestModel, UpdateInfoRequestModel,
+                                ChangePasswordRequestModel, DeleteUserRequestModel)
 
 from dependencies.dependencies import CurrentUser, AppDatabase, AppPasswordHash
 
@@ -82,7 +82,7 @@ async def login(user_data: Annotated[LoginRequestModel, Form()], password_hash: 
                   description="Get a new pair of tokens using the refresh token.",
                   response_model=TokensResponseModel,
                   status_code=status.HTTP_200_OK)
-async def refresh_tokens(user_data: Annotated[RefreshTokensRequest, Body()], db: AppDatabase):
+async def refresh_tokens(user_data: Annotated[RefreshTokensRequestModel, Body()], db: AppDatabase):
     token_bytes = user_data.token.encode("utf-8")
     username = TokenService.decode_token(token_bytes, "refresh")
     current_user = await db.exec_query(Queries.get_user_query(username))
@@ -107,7 +107,7 @@ async def get_user(user: CurrentUser):
 
 @user_router.put("/me/update-info/",
                  description="Update user info.",
-                 response_model=UpdateInfoRequestModel,
+                 response_model=UserResponseModel,
                  status_code=status.HTTP_200_OK)
 async def update_user_data(user_data: Annotated[UpdateInfoRequestModel, Form()], user: CurrentUser, db: AppDatabase):
     updated_user = await db.exec_query(Queries.update_user_query(user.id, user_data.model_dump()))
@@ -131,7 +131,7 @@ async def change_password(data: Annotated[ChangePasswordRequestModel, Form()], u
 @user_router.delete("/me/delete/",
                     description="Delete the current user account.",
                     status_code=status.HTTP_204_NO_CONTENT)
-async def delete_account(data: Annotated[DeleteUserRequest, Form()], user: CurrentUser, db: AppDatabase):
+async def delete_account(data: Annotated[DeleteUserRequestModel, Form()], user: CurrentUser, db: AppDatabase):
     confirmation = data.confirmation
 
     if not confirmation:

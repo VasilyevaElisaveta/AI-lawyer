@@ -11,7 +11,7 @@ from user.queries import Queries
 from user.endpoints import user_router
 from chat.endpoints import chat_router
 from documents.endpoints import documents_router
-# from statistics.endpoints import statistics_router
+from admin.endpoints import admin_router
 from db.Database import Database
 
 
@@ -87,7 +87,7 @@ app.add_middleware(
 app.include_router(user_router, prefix=V1_PREFIX)
 app.include_router(chat_router, prefix=V1_PREFIX)
 app.include_router(documents_router, prefix=V1_PREFIX)
-# app.include_router(statistics_router, prefix=V1_PREFIX)
+app.include_router(admin_router, prefix=V1_PREFIX)
 
 
 if __name__ == "__main__":

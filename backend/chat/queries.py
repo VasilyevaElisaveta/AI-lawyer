@@ -2,7 +2,7 @@ from sqlalchemy import select, insert, delete, update
 from datetime import datetime
 from uuid import UUID
 
-from db.DatabaseModels import Chat, Message, Attachment, File
+from db.DatabaseModels import Chat, Message, Attachment, File, MessageReply
 
 
 class Queries:
@@ -45,7 +45,7 @@ class Queries:
             .limit(limit)
         )
         if before_time is not None:
-            query = query.where(Message.sent_at < before_time)
+            query = query.filter(Message.sent_at > before_time)
 
         return query
     
@@ -55,12 +55,17 @@ class Queries:
         return query
 
     @staticmethod
-    def add_message_to_chat_query(chat_id: UUID, text: str, role: str):
+    def add_message_to_chat_query(chat_id: UUID, text: str, role: str, agent: str=None, tokens: int=None, processing_time: int=None):
         query = (
             insert(Message)
-            .values(chat_id=chat_id, text=text, role=role)
+            .values(chat_id=chat_id, text=text, role=role, agent_type=agent, used_tokens=tokens, processing_time=processing_time)
             .returning(Message.id, Message.text, Message.role, Message.rating)
         )
+        return query
+    
+    @staticmethod
+    def add_message_reply_query(message_id: int, reply_id: int):
+        query = insert(MessageReply).values(message_id=message_id, reply_id=reply_id)
         return query
     
     @staticmethod

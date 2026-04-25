@@ -17,6 +17,14 @@ class ChatRole(StrEnum):
     AI = "ai"
 
 
+class AgentType(StrEnum):
+
+    CONTRACT = "contract"
+    LAWSUIT = "lawsuit" 
+    PRETRIAL_CLAIM = "pretrial_claim" 
+    GENERAL_QUESTION = "general_question"
+
+
 class Base(DeclarativeBase):
     pass
 
@@ -71,6 +79,15 @@ class Message(Base):
     sent_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))
 
 
+class MessageReply(Base):
+
+    __tablename__ = "message_replies"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    message_id: Mapped[int] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"))
+    reply_id: Mapped[int] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"))
+
+
 class Attachment(Base):
 
     __tablename__ = "attachments"
@@ -89,3 +106,4 @@ class File(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     chat_id: Mapped[UUID | None] = mapped_column(ForeignKey("chats.id", ondelete="SET NULL"))
     path: Mapped[str]
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))

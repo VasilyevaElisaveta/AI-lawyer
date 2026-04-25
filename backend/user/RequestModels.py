@@ -69,7 +69,7 @@ class UserResponseModel(BaseModel):
     email: str
 
 
-class RefreshTokensRequest(BaseModel):
+class RefreshTokensRequestModel(BaseModel):
 
     model_config = {"extra": "forbid"}
     
@@ -123,7 +123,7 @@ class ChangePasswordRequestModel(BaseModel):
         return self
 
 
-class DeleteUserRequest(BaseModel):
+class DeleteUserRequestModel(BaseModel):
 
     model_config = {"extra": "forbid"}
 
