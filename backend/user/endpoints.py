@@ -10,6 +10,8 @@ from user.RequestModels import (RegistrationRequestModel, LoginRequestModel,
 
 from dependencies.dependencies import CurrentUser, AppDatabase, AppPasswordHash
 
+from logger import logger
+
 
 
 user_router = APIRouter(prefix="/user", tags=["user"])
@@ -42,13 +44,16 @@ async def register(user_data: Annotated[RegistrationRequestModel, Form()], passw
     
     password = user_data.password
     hashed_password = password_hash.hash(password)
-    return await db.exec_query(
-        Queries.create_user_query(
+
+    new_user = await db.exec_query(Queries.create_user_query(
             username=user_data.username, email=user_data.email, 
             hashed_password=hashed_password, name=user_data.name,
             surname=user_data.surname, patronymic=user_data.patronymic
+            )
         )
-    )
+    
+    logger.info(f"User registered. user_id={new_user.id} username={new_user.username} personal_data_processing_accepted=True user_agreement_accepted=True")
+    return new_user
     
 
 @user_router.post("/login/",
@@ -75,6 +80,8 @@ async def login(user_data: Annotated[LoginRequestModel, Form()], password_hash: 
 
     token_pair = TokenService.get_token_pair(current_user.username)
     token_pair.update({"token_type": "bearer"})
+
+    logger.info(f"User logged. user_id={current_user.id}")
     return token_pair
 
 
@@ -94,6 +101,8 @@ async def refresh_tokens(user_data: Annotated[RefreshTokensRequestModel, Body()]
             )
     token_pair = TokenService.get_token_pair(current_user.username)
     token_pair.update({"token_type": "bearer"})
+
+    logger.info(f"Refreshed tokens. user_id={current_user.id}")
     return token_pair
 
 
@@ -102,6 +111,8 @@ async def refresh_tokens(user_data: Annotated[RefreshTokensRequestModel, Body()]
                  response_model=UserResponseModel,
                  status_code=status.HTTP_200_OK)
 async def get_user(user: CurrentUser):
+
+    logger.info(f"Got user data. user_id={user.id}")
     return user
 
 
@@ -111,6 +122,8 @@ async def get_user(user: CurrentUser):
                  status_code=status.HTTP_200_OK)
 async def update_user_data(user_data: Annotated[UpdateInfoRequestModel, Form()], user: CurrentUser, db: AppDatabase):
     updated_user = await db.exec_query(Queries.update_user_query(user.id, user_data.model_dump()))
+
+    logger.info(f"Updated user data. user_id={user.id}")
     return updated_user
 
 
@@ -126,18 +139,20 @@ async def change_password(data: Annotated[ChangePasswordRequestModel, Form()], u
     new_password_hash = password_hash.hash(new_password)
 
     await db.exec_query(Queries.change_password_query(user.id, new_password_hash), returning=False)
+    logger.info(f"Changed password. user_id={user.id}")
 
 
 @user_router.delete("/me/delete/",
                     description="Delete the current user account.",
                     status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(data: Annotated[DeleteUserRequestModel, Form()], user: CurrentUser, db: AppDatabase):
-    confirmation = data.confirmation
 
-    if not confirmation:
+    if not data.confirmation:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="The user should confirm the account deletion."
         )
     
-    await db.exec_query(Queries.delete_user_query(user.id), returning=False)
+    user_id = user.id
+    await db.exec_query(Queries.delete_user_query(user_id), returning=False)
+    logger.info(f"User deleted account. user_id={user_id}")

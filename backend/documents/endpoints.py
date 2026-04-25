@@ -6,6 +6,8 @@ from documents.queries import Queries
 from documents.RequestModels import DocumentsResponseModel
 from dependencies.dependencies import CurrentUser, AppDatabase
 
+from logger import logger
+
 
 documents_router = APIRouter(prefix="/documents", tags=["documnts"])
 
@@ -16,6 +18,8 @@ documents_router = APIRouter(prefix="/documents", tags=["documnts"])
                       status_code=status.HTTP_200_OK)
 async def get_documents(user: CurrentUser, db: AppDatabase):
     documents = await db.exec_query(Queries.get_user_documents_query(user.id), one_or_none=False)
+    
+    logger.info(f"Got user documents. user_id={user.id}")
     return {"documents": documents}
 
 
@@ -32,6 +36,7 @@ async def get_document(document_id: int, user: CurrentUser, db: AppDatabase):
         await db.exec_query(Queries.delete_document_query(document_id), returning=False)
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
     
+    logger.info(f"User downloaded document. user_id={user.id} document_id={document_id}")
     return FileResponse(
         path=document.path,
         filename=document.name,
@@ -49,3 +54,4 @@ async def delete_document(document_id: int, user: CurrentUser, db: AppDatabase):
     
     Path(document.path).unlink(missing_ok=True)
     await db.exec_query(Queries.delete_document_query(document_id), returning=False)
+    logger.info(f"User deleted document. user_id={user.id} document_id={document_id}")

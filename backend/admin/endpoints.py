@@ -11,6 +11,8 @@ from admin.RequestModels import (MessagesRatingsModel, AppealTypesModel, ChangeP
 from db.DatabaseModels import User
 from dependencies.dependencies import CurrentUser, AppDatabase, AppPasswordHash
 
+from logger import logger
+
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -31,6 +33,8 @@ async def get_messages_statistics_quert(filters: Annotated[MessageFiltersModel, 
     is_admin(admin_user)
 
     messages = await db.exec_query(AdminQueries.get_messages_query(filters), one_or_none=False)
+
+    logger.info(f"Admin user got messages statistics. admin_id={admin_user.id}")
     return {"messages": messages}
 
 
@@ -42,6 +46,8 @@ async def get_messages_ratings_statistics_quert(admin_user: CurrentUser, db: App
     is_admin(admin_user)
 
     statistics = await db.exec_query(AdminQueries.get_messages_retings_amount_query(), one_or_none=False)
+
+    logger.info(f"Admin user got messages ratings statistics. admin_id={admin_user.id}")
     return {"statistics": statistics}
 
 
@@ -53,6 +59,8 @@ async def get_appeal_types_statistics_quert(admin_user: CurrentUser, db: AppData
     is_admin(admin_user)
 
     statistics = await db.exec_query(AdminQueries.get_appeal_types_amount_query(), one_or_none=False)
+
+    logger.info(f"Admin user got appeal type statistics. admin_id={admin_user.id}")
     return {"statistics": statistics}
 
 
@@ -64,6 +72,8 @@ async def get_agent_type_statistics_query(admin_user: CurrentUser, db: AppDataba
     is_admin(admin_user)
 
     statistics = await db.exec_query(AdminQueries.get_agents_types_query(), one_or_none=False)
+
+    logger.info(f"Admin user got agent type statistics. admin_id={admin_user.id}")
     return {"statistics": statistics}
     
 
@@ -75,6 +85,8 @@ async def get_agent_rating(admin_user: CurrentUser, db: AppDatabase):
     is_admin(admin_user)
 
     statistics = await db.exec_query(AdminQueries.get_agents_ratings_query(), one_or_none=False)
+
+    logger.info(f"Admin user got agent rating statistics. admin_id={admin_user.id}")
     return {"statistics": statistics}
     
 
@@ -86,6 +98,8 @@ async def get_users(filters: Annotated[UserFiltersModel, Query()], admin_user: C
     is_admin(admin_user)
 
     users = await db.exec_query(AdminQueries.get_users_query(filters), one_or_none=False)
+
+    logger.info(f"Admin user got users statistics. admin_id={admin_user.id}")
     return {"users": users}
     
 
@@ -96,7 +110,10 @@ async def get_users(filters: Annotated[UserFiltersModel, Query()], admin_user: C
 async def get(username: str, admin_user: CurrentUser, db: AppDatabase):
     is_admin(admin_user)
 
-    return await db.exec_query(UserQueries.get_user_query(username))
+    user_data = await db.exec_query(UserQueries.get_user_query(username))
+
+    logger.info(f"Admin user got user data. admin_id={admin_user.id} user_id={user_data.id}")
+    return user_data
 
     
 @admin_router.put("/users/{username}/",
@@ -115,6 +132,8 @@ async def update_user_data(username: str, user_data: Annotated[UpdateInfoRequest
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="There is another user with this username.")
     
     updated_user = await db.exec_query(UserQueries.update_user_query(user.id, user_data.model_dump()))
+
+    logger.info(f"Admin user updated user data. admin_id={admin_user.id} user_id={updated_user.id}")
     return updated_user
 
 
@@ -128,6 +147,8 @@ async def change_user_password(username: str, data: Annotated[ChangePasswordMode
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can not change another admin data.")
     
     hashed_password = password_hash.hash(data.new_password)
+
+    logger.info(f"Admin user changed user password. admin_id={admin_user.id} user_id={user.id}")
     await db.exec_query(UserQueries.change_password_query(user.id, hashed_password), returning=False)
     
 
@@ -147,4 +168,6 @@ async def detele_user(username: str, data: Annotated[DeleteUserRequestModel, For
             detail="The user should confirm the account deletion."
         )
     
-    await db.exec_query(UserQueries.delete_user_query(user.id), returning=False)
+    user_id = user.id
+    await db.exec_query(UserQueries.delete_user_query(user_id), returning=False)
+    logger.info(f"Admin user deleted user. admin_id={admin_user.id} user_id={user_id}")

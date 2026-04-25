@@ -9,7 +9,7 @@ class RegistrationRequestModel(BaseModel):
 
     name: str
     surname: str
-    patronymic: str | None
+    patronymic: str | None = None
     username: str
     email: str
     password: str = Field(min_length=8)
@@ -82,7 +82,7 @@ class UpdateInfoRequestModel(BaseModel):
 
     name: str
     surname: str
-    patronymic: str | None
+    patronymic: str | None = None
     username: str
     email: str
 

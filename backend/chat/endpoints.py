@@ -13,6 +13,8 @@ from chat.RequestModels import (CreateChatResponseModel, ChatsHistoryResponseMod
 from dependencies.dependencies import CurrentUser, AppDatabase
 from db.DatabaseModels import MIN_MESSAGE_RATING, MAX_MESSAGE_RATING
 
+from logger import logger
+
 
 load_dotenv()
 
@@ -25,7 +27,11 @@ chat_router = APIRouter(prefix="/chat", tags=["chat"])
                   response_model=CreateChatResponseModel,
                   status_code=status.HTTP_201_CREATED)
 async def create_chat(user: CurrentUser, db: AppDatabase):
-    return await db.exec_query(Queries.create_chat_query(user.id))
+    
+    new_chat = await db.exec_query(Queries.create_chat_query(user.id))
+
+    logger.info(f"User created chat. user_id={user.id} chat_id={new_chat.id}")
+    return new_chat
 
 
 @chat_router.get("/history/",
@@ -34,6 +40,8 @@ async def create_chat(user: CurrentUser, db: AppDatabase):
                  status_code=status.HTTP_200_OK)
 async def get_history(user: CurrentUser, db: AppDatabase):
     chats = await db.exec_query(Queries.get_chats_history_query(user.id), returning=True, one_or_none=False)
+
+    logger.info(f"User got chat history. user_id={user.id}")
     return {"chats": chats}
     
 
@@ -70,6 +78,7 @@ async def get_chat_messages(chat_id: UUID, user: CurrentUser, db: AppDatabase,
         if row.file_id is not None:
             messages[row.id]["files"].append({"id": row.file_id, "name": row.file_name})
 
+    logger.info(f"User got messages from chat. user_id={user.id} chat_id={chat_id}")
     return {"messages": list(messages.values())}
 
 
@@ -122,6 +131,7 @@ async def send_message(chat_id: UUID, data: Annotated[OneMessageRequestModel, Fo
     else:
         ai_message["files"] = []
 
+    logger.info(f"User sent messages to chat. user_id={user.id} chat_id={chat_id} message_id={human_message.id}")
     return {"message": ai_message}
     
 
@@ -141,6 +151,7 @@ async def rate_message(chat_id: UUID, message_id: int, data: Annotated[RatingMod
     if current_message.role != "ai":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User can rate only ai messages.")
 
+    logger.info(f"User rated message. user_id={user.id} chat_id={chat_id} message_id={message_id}")
     return await db.exec_query(Queries.add_rating_to_message_query(message_id, data.rating))
 
 
@@ -152,4 +163,5 @@ async def delete_chat(chat_id: UUID, user: CurrentUser, db: AppDatabase):
     if current_chat is None or user.id != current_chat.user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
     
+    logger.info(f"User deleted chat. user_id={user.id} chat_id={chat_id}")
     await db.exec_query(Queries.delete_chat_query(chat_id), returning=False)
