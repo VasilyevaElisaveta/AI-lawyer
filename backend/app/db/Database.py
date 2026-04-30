@@ -37,15 +37,8 @@ class Database:
             
             self.__session = sessionmaker(self.__engine)
         else:
-            user = getenv("POSTGRES_USER", "<Postgres user>")
-            password = getenv("POSTGRES_PASSWORD", "<Postgres user password>")
-            host = getenv("POSTGRES_HOST", "<Postgres host>")
-            port = getenv("POSTGRES_PORT", "<Postgres port>")
-            db = getenv("POSTGRES_DB", "<Postgres db>")
-            self.__engine = create_async_engine(
-                Database.__ASYNC_PATH_BASE + f"{user}:{password}@{host}:{port}/{db}",
-                echo=detail
-            )
+            url = Database.get_async_url()
+            self.__engine = create_async_engine(url, echo=detail)
             self.__session = async_sessionmaker(self.__engine)
 
     async def reset(self):
@@ -62,6 +55,16 @@ class Database:
 
         if self.__is_sync and self.__is_temp:
             self.__temp_db_dir.cleanup()
+
+    @staticmethod
+    def get_async_url() -> str:
+        user = getenv("POSTGRES_USER", "user")
+        password = getenv("POSTGRES_PASSWORD", "password")
+        host = getenv("POSTGRES_HOST", "host")
+        port = getenv("POSTGRES_PORT", "5432")
+        db = getenv("POSTGRES_DB", "db")
+        url = Database.__ASYNC_PATH_BASE + f"{user}:{password}@{host}:{port}/{db}"
+        return url
 
     def __exec_sync(self, query, returning: bool):
         with self.__session() as session:

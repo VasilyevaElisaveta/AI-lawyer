@@ -14,7 +14,7 @@ def setup_logger() -> logging.Logger:
     logger.setLevel(logging.DEBUG)
 
     formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)s |  %(message)s",
+        fmt="%(asctime)s | %(levelname)s |  BACKEND | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 

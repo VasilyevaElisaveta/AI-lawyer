@@ -106,7 +106,7 @@ class Queries:
                    User.is_admin, User.name, User.surname,
                    User.patronymic, chats, tokens)
             .outerjoin_from(User, Chat, User.id == Chat.user_id)
-            .outerjoin(Message, Chat.id == Message.id)
+            .outerjoin(Message, Message.chat_id == Chat.id)
             .group_by(User.id)
         )
 
