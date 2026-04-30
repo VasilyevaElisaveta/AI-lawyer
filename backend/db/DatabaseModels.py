@@ -55,15 +55,6 @@ class Chat(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(tz=timezone.utc))
 
 
-class ChatSummary(Base):
-    
-    __tablename__ = "chat_summaries"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"))
-    summary: Mapped[str]
-
-
 class Message(Base):
 
     __tablename__ = "messages"

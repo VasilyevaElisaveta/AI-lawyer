@@ -10,8 +10,14 @@ from user.RequestModels import (RegistrationRequestModel, LoginRequestModel,
 
 from dependencies.dependencies import CurrentUser, AppDatabase, AppPasswordHash
 
+from dotenv import load_dotenv
+from os import getenv
+from shutil import rmtree
+
 from logger import logger
 
+
+load_dotenv()
 
 
 user_router = APIRouter(prefix="/user", tags=["user"])
@@ -153,6 +159,9 @@ async def delete_account(data: Annotated[DeleteUserRequestModel, Form()], user: 
             detail="The user should confirm the account deletion."
         )
     
-    user_id = user.id
-    await db.exec_query(Queries.delete_user_query(user_id), returning=False)
-    logger.info(f"User deleted account. user_id={user_id}")
+    await db.exec_query(Queries.delete_user_query(user.id), returning=False)
+
+    user_storage_path = getenv("storage_path", "storage") + f"/{user.username}/"
+    rmtree(user_storage_path, ignore_errors=True)
+
+    logger.info(f"User deleted account. user_id={user.id}")

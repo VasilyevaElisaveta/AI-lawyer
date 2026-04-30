@@ -11,7 +11,14 @@ from admin.RequestModels import (MessagesRatingsModel, AppealTypesModel, ChangeP
 from db.DatabaseModels import User
 from dependencies.dependencies import CurrentUser, AppDatabase, AppPasswordHash
 
+from dotenv import load_dotenv
+from os import getenv
+from shutil import rmtree
+
 from logger import logger
+
+
+load_dotenv()
 
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
@@ -168,6 +175,9 @@ async def detele_user(username: str, data: Annotated[DeleteUserRequestModel, For
             detail="The user should confirm the account deletion."
         )
     
-    user_id = user.id
-    await db.exec_query(UserQueries.delete_user_query(user_id), returning=False)
-    logger.info(f"Admin user deleted user. admin_id={admin_user.id} user_id={user_id}")
+    await db.exec_query(UserQueries.delete_user_query(user.id), returning=False)
+
+    user_storage_path = getenv("storage_path", "storage") + f"/{user.username}/"
+    rmtree(user_storage_path, ignore_errors=True)
+
+    logger.info(f"Admin user deleted user. admin_id={admin_user.id} user_id={user.id}")

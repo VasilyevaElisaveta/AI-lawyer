@@ -6,5 +6,8 @@
 # database
 *.db
 
-#logs
+# logs
 logs/
+
+# file storage
+storage/
