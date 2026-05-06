@@ -11,7 +11,7 @@ from ...state import ContractAgentState
 logger = LoggerFactory.get_logger(
     name="ContractAgentDocumentGeneratorFinalNode",
     logs_path=os.getenv("LOGS_DIR"),
-    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
 
 

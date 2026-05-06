@@ -13,7 +13,7 @@ from claims_agent.state import ClaimsAgentState
 logger = LoggerFactory.get_logger(
     name=__name__,
     logs_path=os.getenv("LOGS_DIR"),
-    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
 
 # Минимально необходимые текстовые поля (общие для иска и претензии)

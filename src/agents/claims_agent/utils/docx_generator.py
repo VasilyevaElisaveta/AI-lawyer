@@ -17,7 +17,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 logger = LoggerFactory.get_logger(
     name=__name__,
     logs_path=os.getenv("LOGS_DIR"),
-    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
 
 

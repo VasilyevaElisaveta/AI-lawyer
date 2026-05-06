@@ -2,6 +2,16 @@ from pydantic import BaseModel
 from typing import Optional
 
 
+class ChatNameRequest(BaseModel):
+    raw_input: str
+    chat_id: str
+
+
+class ChatNameResponse(BaseModel):
+    chat_id: str
+    chat_name: str
+
+
 class ChatRequest(BaseModel):
     raw_input: str
     thread_id: str

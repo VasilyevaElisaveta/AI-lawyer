@@ -1,20 +1,34 @@
 import os
-
-from libs.logger import LoggerFactory
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from libs.logger import LoggerFactory
+
 from .api.routes import router
 from .core.settings import settings
-from .services.agent_service import AgentService
+from .services import AgentService, LLMService
 
 
 logger = LoggerFactory.get_logger(
     name=__name__,
     logs_path=os.getenv("LOGS_DIR"),
-    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info(f"=== {settings.APP_NAME} v{settings.APP_VERSION} запущен ===")
+    logger.info(f"Debug mode: {settings.DEBUG}")
+    app.state.agent_service = AgentService()
+    app.state.llm_service = LLMService()
+
+    try:
+        yield
+    finally:
+        logger.info(f"=== {settings.APP_NAME} завершил работу ===")
 
 
 def create_app() -> FastAPI:
@@ -22,6 +36,7 @@ def create_app() -> FastAPI:
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
         debug=settings.DEBUG,
+        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -32,17 +47,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.on_event("startup")
-    async def startup_event():
-        logger.info(f"=== {settings.APP_NAME} v{settings.APP_VERSION} запущен ===")
-        logger.info(f"Debug mode: {settings.DEBUG}")
-        app.state.agent_service = AgentService()
-
-    @app.on_event("shutdown")
-    async def shutdown_event():
-        logger.info(f"=== {settings.APP_NAME} завершил работу ===")
-
-    app.include_router(router, prefix="/api/chat", tags=["chat"])
+    app.include_router(router, prefix="/api/chat")
     return app
 
 

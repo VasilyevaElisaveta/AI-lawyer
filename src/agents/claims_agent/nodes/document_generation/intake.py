@@ -24,7 +24,7 @@ from claims_agent.prompts import (
 logger = LoggerFactory.get_logger(
     name=__name__,
     logs_path=os.getenv("LOGS_DIR"),
-    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
 
 # Поля, которые маппятся 1-к-1 из input_data в state

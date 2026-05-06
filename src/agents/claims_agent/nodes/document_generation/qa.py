@@ -26,7 +26,7 @@ from claims_agent.nodes.document_generation.calc import _fmt
 logger = LoggerFactory.get_logger(
     name=__name__,
     logs_path=os.getenv("LOGS_DIR"),
-    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
 
 _QA_PASS_THRESHOLD = 7  # минимальный балл для прохождения
