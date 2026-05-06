@@ -1,3 +1,7 @@
+import os
+
+from libs.logger import LoggerFactory
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableConfig
@@ -9,10 +13,12 @@ from .promtps import (
 
 from ....utils import safe_parse_json
 
-from .....utils import LoggerFactory
 
-
-logger = LoggerFactory.get_logger("ContractAgentQuestionAnswererAnswerNode")
+logger = LoggerFactory.get_logger(
+    name="ContractAgentQuestionAnswererAnswerNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 async def contract_answer_decision_node(state, llm, config: RunnableConfig | None = None):

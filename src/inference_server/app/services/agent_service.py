@@ -1,6 +1,7 @@
 import os
-import logging
 from dotenv import load_dotenv
+
+from libs.logger import LoggerFactory
 
 from .agents.contract_agent import ContractGraphAgent
 from .agents.claims_agent import ClaimsGraphAgent
@@ -12,7 +13,11 @@ from ..schemas.chat import ChatRequest, ChatResponse
 from ....agents.llm_client import create_gigachat, DEFAULT_GIGACHAT_PARAMS
 
 
-logger = logging.getLogger(__name__)
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 load_dotenv()
 
 
@@ -84,7 +89,8 @@ class AgentService:
                     return ChatResponse(
                         reply=f"Неизвестный тип агента: {request.agent_type}",
                         handled_by_agent=False,
-                        document_created=False
+                        document_created=False,
+                        is_error=True,
                     )
                 result = await agent.run(request.raw_input, request.thread_id)
                 return self._to_response(result)
@@ -140,5 +146,5 @@ class AgentService:
             reply=result.get("reply", ""),
             handled_by_agent=result.get("handled_by_agent", True),
             document_created=result.get("document_created", False),
-            is_error=False
+            is_error=result.get("is_error", True)
         )

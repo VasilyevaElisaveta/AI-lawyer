@@ -7,24 +7,28 @@
   • порядок производства (исковое / особое / приказное / упрощённое)
   • проверка досудебного порядка
 """
-from __future__ import annotations
-
+import os
 import json
 from dataclasses import dataclass, asdict, field
 from typing import Any, Literal, cast
+
+from libs.logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from claims_agent.state import ClaimsAgentState
 from claims_agent.services.llm_client import invoke_llm
-from claims_agent.utils.logger import get_logger
 from claims_agent.prompts import (
     CLASSIFICATION_HUMAN,
     CLASSIFICATION_SYSTEM,
     render_template,
 )
 
-logger = get_logger(__name__)
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 # ═══════════════════════════════════════════════════════════════

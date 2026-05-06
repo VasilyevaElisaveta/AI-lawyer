@@ -1,15 +1,15 @@
 """
 Модуль генерации документов: исковых заявлений и претензий.
 """
-from __future__ import annotations
-
+import os
 from typing import Any
+
+from libs.logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from claims_agent.state import ClaimsAgentState
 from claims_agent.services.llm_client import invoke_llm
-from claims_agent.utils.logger import get_logger
 from claims_agent.prompts import (
     GENERATOR_HUMAN,
     GENERATOR_REWORK_HUMAN,
@@ -20,7 +20,12 @@ from claims_agent.prompts import (
     render_template,
 )
 
-logger = get_logger(__name__)
+
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def generator_node(state: ClaimsAgentState) -> dict[str, Any]:

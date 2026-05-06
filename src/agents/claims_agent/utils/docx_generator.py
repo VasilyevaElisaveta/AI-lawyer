@@ -1,20 +1,24 @@
 """
 Генерация DOCX-документа из текста искового заявления.
 """
-from __future__ import annotations
-
+import os
 import base64
 import io
 import unicodedata
 from typing import Any
 
+from libs.logger import LoggerFactory
+
 from docx import Document
 from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-from .logger import get_logger
 
-logger = get_logger(__name__)
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def generate_docx_base64(document_text: str, metadata: dict[str, Any] | None = None) -> str:

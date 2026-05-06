@@ -1,4 +1,7 @@
+import os
 import re
+
+from libs.logger import LoggerFactory
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
@@ -7,10 +10,12 @@ from .prompts import CONTRACT_SUMMARY_SYSTEM, CONTRACT_SUMMARY_PROMPT
 
 from ....utils import _normalize_space
 
-from .....utils import LoggerFactory
 
-
-logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorSummarizatorNode")
+logger = LoggerFactory.get_logger(
+    name="ContractAgentDocumentGeneratorSummarizatorNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def _strip_code_fence(text: str) -> str:

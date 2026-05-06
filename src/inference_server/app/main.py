@@ -1,4 +1,7 @@
-import logging
+import os
+
+from libs.logger import LoggerFactory
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,7 +10,11 @@ from .core.settings import settings
 from .services.agent_service import AgentService
 
 
-logger = logging.getLogger(__name__)
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def create_app() -> FastAPI:

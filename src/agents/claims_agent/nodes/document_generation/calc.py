@@ -1,14 +1,20 @@
 """
 Модуль расчётов.
 """
-from __future__ import annotations
+import os
 from datetime import date, datetime
 from typing import Any
 
-from claims_agent.state import ClaimsAgentState
-from claims_agent.utils.logger import get_logger
+from libs.logger import LoggerFactory
 
-logger = get_logger(__name__)
+from claims_agent.state import ClaimsAgentState
+
+
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 # ═══════════════════════════════════════════════════════════════
 #  Публичный узел графа

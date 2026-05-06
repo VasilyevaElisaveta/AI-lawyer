@@ -1,6 +1,8 @@
-import logging
+import os
 from datetime import datetime
 from typing import Dict, Any
+
+from libs.logger import LoggerFactory
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
@@ -8,7 +10,11 @@ from ..schemas.chat import ChatRequest, ChatResponse
 from ..services.agent_service import AgentService
 
 
-logger = logging.getLogger(__name__)
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 router = APIRouter(tags=["chat"])
 
 

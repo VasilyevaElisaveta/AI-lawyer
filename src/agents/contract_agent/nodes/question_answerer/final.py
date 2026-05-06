@@ -1,8 +1,15 @@
+import os
+
+from libs.logger import LoggerFactory
+
 from langchain_core.messages import AIMessage
 
-from .....utils import LoggerFactory
 
-logger = LoggerFactory.get_logger("ContractAgentQuestionAnswererFinalNode")
+logger = LoggerFactory.get_logger(
+    name="ContractAgentQuestionAnswererFinalNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 async def contract_question_answer_node(state):

@@ -1,18 +1,23 @@
 """
 Инициализация и переиспользование GigaChat LLM.
 """
-from __future__ import annotations
-
+import os
 import time
 from functools import lru_cache
+
+from libs.logger import LoggerFactory
 
 from langchain_gigachat import GigaChat
 from langchain_core.messages import BaseMessage
 
 from claims_agent.config import get_settings
-from claims_agent.utils.logger import get_logger
 
-logger = get_logger(__name__)
+
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 @lru_cache

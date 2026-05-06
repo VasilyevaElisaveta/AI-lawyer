@@ -1,13 +1,18 @@
+import os
 from typing import Any, Dict
+
+from libs.logger import LoggerFactory
 
 from langchain_core.messages import AIMessage
 
 from ...state import ContractAgentState
 
-from .....utils import LoggerFactory
 
-
-logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorFinalNode")
+logger = LoggerFactory.get_logger(
+    name="ContractAgentDocumentGeneratorFinalNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def clear_results_before_end(state):

@@ -1,10 +1,11 @@
 """
 Агент для генерации исковых заявлений и претензий.
 """
-from __future__ import annotations
-
+import os
 import asyncio
 from typing import Any
+
+from libs.logger import LoggerFactory
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
@@ -19,10 +20,14 @@ from .nodes import (
     generator_node,
     qa_node,
 )
-from .utils.logger import get_logger
 from .utils.docx_generator import generate_docx_base64
 
-logger = get_logger(__name__)
+
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 # Допустимые типы документов
 _DOCUMENT_TYPES = {"lawsuit", "complaint"}

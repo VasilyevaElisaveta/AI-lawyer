@@ -1,10 +1,17 @@
+import os
 from collections.abc import AsyncIterator
 from uuid import uuid4
 import httpx
-import logging
 from pydantic import BaseModel
 
-logger = logging.getLogger(__name__)
+from libs.logger import LoggerFactory
+
+
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 class InferenceResponse(BaseModel):

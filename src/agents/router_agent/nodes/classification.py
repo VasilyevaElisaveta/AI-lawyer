@@ -1,4 +1,7 @@
+import os
 from typing import Any, Dict
+
+from libs.logger import LoggerFactory
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
@@ -12,9 +15,12 @@ from ..state import RouterAgentState
 
 from ...utils import safe_parse_json
 
-from ....utils import LoggerFactory
 
-logger = LoggerFactory.get_logger("RouterAgentClassificationNode")
+logger = LoggerFactory.get_logger(
+    name="RouterAgentClassificationNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:

@@ -3,24 +3,29 @@
 Прототип: генерация применимых норм через LLM.
 Будущее: RAG по векторной БД с кодексами и законами.
 """
-from __future__ import annotations
-
+import os
 import json
 import re
 from typing import Any
+
+from libs.logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from claims_agent.state import ClaimsAgentState
 from claims_agent.services.llm_client import invoke_llm
-from claims_agent.utils.logger import get_logger
 from claims_agent.prompts import (
     RESEARCH_HUMAN,
     RESEARCH_SYSTEM,
     render_template,
 )
 
-logger = get_logger(__name__)
+
+logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 _CASE_TYPE_LABELS = {
     "civil": "Гражданское судопроизводство (суд общей юрисдикции)",

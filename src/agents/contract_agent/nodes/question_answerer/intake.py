@@ -1,8 +1,15 @@
+import os
+
+from libs.logger import LoggerFactory
+
 from ....utils import messages_to_str, documents_to_str
 
-from .....utils import LoggerFactory
 
-logger = LoggerFactory.get_logger("ContractAgentQuestionAnswererIntakeNode")
+logger = LoggerFactory.get_logger(
+    name="ContractAgentQuestionAnswererIntakeNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def _clear_previous_run_results(state):

@@ -1,6 +1,9 @@
+import os
 import base64
 import re
 from io import BytesIO
+
+from libs.logger import LoggerFactory
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -10,10 +13,12 @@ from .documents_templates import CONTRACT_TEMPLATES
 
 from ....utils import _normalize_space
 
-from .....utils import LoggerFactory
 
-
-logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorDocxNode")
+logger = LoggerFactory.get_logger(
+    name="ContractAgentDocumentGeneratorDocxNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def _add_inline_markdown(paragraph, text: str):

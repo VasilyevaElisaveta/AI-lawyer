@@ -1,3 +1,5 @@
 from .logger import LoggerFactory
 
-__all__ = ["LoggerFactory"]
+__all__ = [
+    "LoggerFactory"
+]

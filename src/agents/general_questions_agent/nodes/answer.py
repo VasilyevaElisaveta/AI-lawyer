@@ -1,4 +1,7 @@
+import os
 from typing import Any, Dict
+
+from libs.logger import LoggerFactory
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -8,9 +11,11 @@ from ..prompts import ANSWER_SYSTEM, ANSWER_PROMPT
 
 from ...utils import render_template
 
-from ....utils import LoggerFactory
-
-logger = LoggerFactory.get_logger("GeneralQuestionsAgentAnswerNode")
+logger = LoggerFactory.get_logger(
+    name="GeneralQuestionsAgentAnswerNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:

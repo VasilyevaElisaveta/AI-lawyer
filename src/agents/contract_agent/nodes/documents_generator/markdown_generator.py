@@ -1,6 +1,9 @@
+import os
 import json
 import re
 from typing import Any
+
+from libs.logger import LoggerFactory
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
@@ -11,10 +14,12 @@ from .prompts import (
 )
 from .documents_templates import CONTRACT_TEMPLATES
 
-from .....utils import LoggerFactory
 
-
-logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorMarkdownNode")
+logger = LoggerFactory.get_logger(
+    name="ContractAgentDocumentGeneratorMarkdownNode",
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") is not "DEBUG" else None,
+)
 
 
 def _strip_code_fence(text: str) -> str:
