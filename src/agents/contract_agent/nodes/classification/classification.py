@@ -6,6 +6,8 @@ from .prompts import (
     CLASSIFICATION_PROMPT, CLASSIFICATION_SYSTEM
 )
 
+from ....utils import messages_to_str
+
 from .....utils import LoggerFactory
 
 
@@ -19,8 +21,11 @@ async def contract_classification_node(
 ):
     logger.info("Start...")
     raw_input = state.get("raw_input", "")
+    messages = state.get("messages", []) or []
+    messages_str = messages_to_str(messages)
+    conversation_summary = state.get("conversation_summary", "")
 
-    input_d = make_classification_dict(raw_input)
+    input_d = make_classification_dict(raw_input, messages_str, conversation_summary)
     prompt = ChatPromptTemplate.from_messages([
         ("system", CLASSIFICATION_SYSTEM),
         ("human", CLASSIFICATION_PROMPT)

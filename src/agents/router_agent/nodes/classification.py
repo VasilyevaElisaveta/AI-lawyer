@@ -22,7 +22,6 @@ logger = LoggerFactory.get_logger("RouterAgentClassificationNode")
 async def classification_node(
         state: RouterAgentState, 
         llm, 
-        previous_node: str | None = None,
         config: RunnableConfig | None = None
 ) -> Dict[str, Any]:
     """
@@ -44,12 +43,6 @@ async def classification_node(
             "error_message": "Не получено сообщение пользователя",
             "reply": "Ошибка: пустой запрос",
             "routed_to": "none",
-        }
-    
-    if previous_node is not None:
-        return {
-            "routed_to": previous_node,
-            "reply": "",
         }
     
     prompt = ChatPromptTemplate.from_messages([

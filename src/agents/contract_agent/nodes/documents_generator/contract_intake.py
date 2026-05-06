@@ -108,8 +108,6 @@ async def contract_generator_intake_node(
     merged_state["collected_fields"] = collected_fields
 
     if not contract_type:
-        updates["doc_type"] = "contract"
-        updates["current_node"] = "contract"
         updates["is_valid"] = False
         updates["response_to_user"] = "Не удалось определить тип договора. Пожалуйста, уточните запрос."
         logger.warning("Unable to identify contract type")
