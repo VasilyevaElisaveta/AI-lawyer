@@ -4,22 +4,13 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 
-from .nodes import answer_node
+from .nodes import answer_node, clear_previous_run_results
 from .state import GeneralQuestionAgentState
 
 from ...memory import memory_node
 
 
 def create_graph(llm) -> StateGraph:
-    """
-    Создаёт граф агента простых вопросов.
-    
-    Граф состоит из одного узла:
-    1. answer - генерация ответа на вопрос
-    
-    После генерации ответа граф завершает работу.
-    """
-
     async def memory_node_wrapper(
         state: GeneralQuestionAgentState, 
         config: RunnableConfig | None = None
@@ -31,14 +22,20 @@ def create_graph(llm) -> StateGraph:
         config: RunnableConfig | None = None
     ) -> dict[str, Any]:
         return await answer_node(state, llm, config=config)
+    
+    async def clear_results_wrapper(
+        state: GeneralQuestionAgentState,
+    ) -> dict[str, Any]:
+        return await clear_previous_run_results(state)
 
     graph = StateGraph(GeneralQuestionAgentState)
 
+    graph.add_edge("clear", clear_results_wrapper)
     graph.add_node("memory", memory_node_wrapper)
     graph.add_node("answer", answer_node_wrapper)
 
-    # Определяем рёбра
-    graph.add_edge(START, "memory")
+    graph.add_edge(START, "clear")
+    graph.add_edge("clear", "memory")
     graph.add_edge("memory", "answer")
     graph.add_edge("answer", END)
 

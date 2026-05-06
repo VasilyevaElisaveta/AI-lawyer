@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, TypedDict
+from typing import Annotated, Any, Literal, TypedDict, Optional
 
 from langgraph.graph.message import add_messages
 
@@ -17,7 +17,7 @@ class RouterAgentState(TypedDict, total=False):
     messages: Annotated[list, add_messages]
 
     # ── Входные данные ────────────────────────────────────
-    raw_input: str                  # свободный текст от пользователя
+    raw_input: Optional[str]                  # свободный текст от пользователя
 
     # ── Результaты классификации ──────────────────────────
     category: Literal["contract", "lawsuit", "pretrial_claim", "general_question"]
@@ -26,8 +26,6 @@ class RouterAgentState(TypedDict, total=False):
 
     # ── Статус реализации ──────────────────────────────────
     is_implemented: bool             # реализован ли обработчик для категории
-    error_message: str               # сообщение об ошибке (если не реализовано)
+    error: Optional[str]
 
-    # ── Финальный результат ────────────────────────────────
-    reply: str                       # ответ коридору (к пользователю)
-    routed_to: str                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "general_question_agent", "none"
+    routed_to: Optional[str]                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "general_question_agent", "none"

@@ -6,17 +6,24 @@ from langchain_core.runnables import RunnableConfig
 from .prompts import (
     ROUTER_CLASSIFICATION_SYSTEM,
     ROUTER_CLASSIFICATION_PROMPT,
-    CATEGORY_NOT_IMPLEMENTED,
-    CLASSIFICATION_ERROR,
 )
 
 from ..state import RouterAgentState
 
-from ...utils import safe_parse_json, render_template
+from ...utils import safe_parse_json
 
 from ....utils import LoggerFactory
 
 logger = LoggerFactory.get_logger("RouterAgentClassificationNode")
+
+
+async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "raw_input": None,
+        "error": None,
+        "routed_to": None,
+        "is_implemented": None,
+    }
 
 
 async def classification_node(
@@ -29,9 +36,9 @@ async def classification_node(
     
     Использует LLM для классификации в одну из 4 категорий:
     - contract (договоры)
-    - lawsuit (иски)
+    - claim (иски)
     - pretrial_claim (досудебные претензии)
-    - general_question (простые вопросы)
+    - general_question (общие вопросы)
     
     Возвращает обновлённое состояние с результатом классификации.
     """
@@ -40,9 +47,7 @@ async def classification_node(
     
     if not raw_input:
         return {
-            "error_message": "Не получено сообщение пользователя",
-            "reply": "Ошибка: пустой запрос",
-            "routed_to": "none",
+            "error": "[router_agent] empty input",
         }
     
     prompt = ChatPromptTemplate.from_messages([
@@ -61,51 +66,36 @@ async def classification_node(
         classification_result = safe_parse_json(raw)
     except Exception as e:
         return {
-            "error_message": f"Ошибка при классификации: {str(e)}",
-            "reply": CLASSIFICATION_ERROR,
-            "routed_to": "none",
+            "error": "[router_agent] ainvoke error",
         }
     
     if not classification_result or "category" not in classification_result:
         return {
-            "error_message": "LLM вернул некорректный результат классификации",
-            "reply": CLASSIFICATION_ERROR,
-            "routed_to": "none",
+            "routed_to": None,
         }
     
     category = classification_result.get("category", "general_question")
     confidence = classification_result.get("confidence", 0.0)
     
-    # Определяем, реализован ли обработчик для этой категории
-    implemented_categories = {"contract"}
+    implemented_categories = {"lawsuit", "general_question"}
     is_implemented = category in implemented_categories
     
-    # Подготавливаем результат
     result: Dict[str, Any] = {
-        "category": category,
+        "routed_to": {
+            "lawsuit": "lawsuit_agent",
+            "general_question": "general_questions_agent",
+        }.get(category, None),
         "classification_confidence": confidence,
         "classification_result": classification_result,
         "is_implemented": is_implemented,
     }
     
-    # Определяем маршрут и ответ
-    if is_implemented:
-        result["routed_to"] = {
-            "contract": "contract_agent",
-            "general_question": "general_questions_agent",
-        }.get(category, "none")
-        result["reply"] = ""
-    else:
-        # Категория не реализована
-        result["routed_to"] = "none"
-        result["error_message"] = f"Категория '{category}' ещё не реализована"
-        result["reply"] = render_template(
-            CATEGORY_NOT_IMPLEMENTED,
-            {"category": category}
-        )
+    if not is_implemented:
+        result["routed_to"] = None
+        result["error"] = f"[router_agent] '{category}' not implemented"
     logger.debug(
         f"Got result\n" \
-        f"routed to: {result["routed_to"]}"
+        f"routed to: {result['routed_to']}"
     )
     logger.info("Finish")
     return result

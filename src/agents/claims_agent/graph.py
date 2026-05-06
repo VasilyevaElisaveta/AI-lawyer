@@ -263,7 +263,7 @@ class ClaimsAgent:
 
         return {
             "reply": reply,
-            "handled_by_agent": "lawsuit",
+            "handled_by_agent": True,
             "document_created": False,
             "document_type": document_type,
             "status": pipeline_status,

@@ -4,7 +4,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 
-from .nodes import classification_node
+from .nodes import classification_node, clear_previous_run_results
 from .state import RouterAgentState
 
 
@@ -18,6 +18,11 @@ def create_graph(llm) -> StateGraph:
     После классификации граф завершает работу, передавая результат классификации.
     """
 
+    async def clear_node_wrapper(
+        state: RouterAgentState,
+    ) -> dict[str, Any]:
+        return await clear_previous_run_results(state)
+
     async def classification_node_wrapper(
         state: RouterAgentState, 
         config: RunnableConfig | None = None
@@ -26,11 +31,12 @@ def create_graph(llm) -> StateGraph:
 
     graph = StateGraph(RouterAgentState)
 
-    # Добавляем узел классификации
+    graph.add_node("clear", clear_node_wrapper)
     graph.add_node("classification", classification_node_wrapper)
 
     # Определяем рёбра
-    graph.add_edge(START, "classification")
+    graph.add_edge(START, "clear")
+    graph.add_edge("clear", "classification")
     graph.add_edge("classification", END)
 
     return graph

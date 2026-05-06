@@ -13,6 +13,14 @@ from ....utils import LoggerFactory
 logger = LoggerFactory.get_logger("GeneralQuestionsAgentAnswerNode")
 
 
+async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "error": None,
+        "reply": None,
+        "raw_input": None,
+    }
+
+
 async def answer_node(
     state: GeneralQuestionAgentState, 
     llm,
@@ -35,13 +43,10 @@ async def answer_node(
     
     if not user_question:
         return {
-            "reply": "Пожалуйста, задайте вопрос."
+            "error": "[general_questions_agent] empty input",
         }
     
-    # Подготавливаем промпт
     prompt = render_template(ANSWER_PROMPT, {"user_question": user_question})
-    
-    # Вызываем LLM для генерации ответа
     try:
         response = await llm.ainvoke([
             SystemMessage(content=ANSWER_SYSTEM),
@@ -51,11 +56,12 @@ async def answer_node(
         )
         reply = response.content
     except Exception as e:
-        reply = f"Ошибка при обработке вашего вопроса: {str(e)}"
+        return {
+            "error": "[general_questions_agent] ainvoke error",
+        }
 
     messages = state.get("messages", []) or []
     messages.append(AIMessage(content=reply))
-    state["messages"] = messages
     logger.debug(f"Got result reply: {reply}")
     logger.info("Finish")
     return {

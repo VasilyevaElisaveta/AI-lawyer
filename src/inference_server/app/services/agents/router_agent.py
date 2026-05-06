@@ -11,8 +11,10 @@ class RouterGraphAgent(BaseGraphAgent):
     
     async def run(self, message: str, thread_id: str) -> dict[str, Any]:
         result = await self.agent.process_user_message(message, thread_id)
+        error = result.get("error", None)
+        routed_to = result.get("routed_to", None)
         return {
-            "routed_to": result.get("routed_to", "general_questions_agent"),
-            "classification_confidence": result.get("classification_confidence", 0.0),
+            "routed_to": routed_to,
+            "error": error,
             "handled_by_agent": True,
         }
