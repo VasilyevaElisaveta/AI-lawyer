@@ -11,10 +11,14 @@ class RouterGraphAgent(BaseGraphAgent):
     
     async def run(self, message: str, thread_id: str) -> dict[str, Any]:
         result = await self.agent.process_user_message(message, thread_id)
-        error = result.get("error", None)
-        routed_to = result.get("routed_to", None)
+        response = result.get("response", {})
+        metadata = result.get("metadata", {})
+        metadata["process_name"] = "router_agent"
+        error = response.get("error", None)
+        routed_to = response.get("routed_to", None)
         return {
             "routed_to": routed_to,
             "error": error,
             "handled_by_agent": True,
+            "metadata": metadata
         }

@@ -20,11 +20,15 @@ class GeneralQuestionsGraphAgent(BaseGraphAgent):
             - document_created: был ли создан документ
         """
         result = await self.agent.process_user_message(message, thread_id)
-        error = result.get("error", None)
-        reply = result.get("reply", "Ответ пустой")
+        response = result.get("response", {})
+        metadata = result.get("metadata", {})
+        metadata["process_name"] = "general_questions_agent"
+        error = response.get("error", None)
+        reply = response.get("reply", "Ответ пустой")
         return {
             "reply": reply,
             "handled_by_agent": result.get("handled_by_agent", True),
             "document_created": False,
             "error": error,
+            "metadata": metadata,
         }

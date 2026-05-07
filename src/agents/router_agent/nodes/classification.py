@@ -25,11 +25,16 @@ logger = LoggerFactory.get_logger(
 
 async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "raw_input": None,
         "error": None,
         "routed_to": None,
         "is_implemented": None,
         "usage_metadata": None,
+    }
+
+
+async def clear_before_end(state: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "raw_input": None,
     }
 
 

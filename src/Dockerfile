@@ -5,8 +5,6 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-WORKDIR /app
-
 RUN pip install --upgrade pip setuptools wheel build
 
 WORKDIR /build/logger
@@ -21,5 +19,7 @@ RUN pip install -r requirements.txt
 RUN pip install /build/logger/dist/*.whl
 
 COPY . /app
+
+EXPOSE 8000
 
 CMD ["python", "-m", "uvicorn", "inference_server.app.main:app", "--host", "0.0.0.0", "--port", "8000"]

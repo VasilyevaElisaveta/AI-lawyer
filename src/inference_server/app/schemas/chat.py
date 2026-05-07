@@ -10,6 +10,13 @@ class ChatNameRequest(BaseModel):
 class ChatNameResponse(BaseModel):
     chat_id: str
     chat_name: str
+    latency_ms: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    run_id: str
+    trace_id: str
+    process_name: str
 
 
 class ChatRequest(BaseModel):
@@ -24,3 +31,10 @@ class ChatResponse(BaseModel):
     handled_by_agent: bool = True
     document_created: bool = False
     is_error: bool = False
+    latency_ms: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
+    run_id: str
+    trace_id: str
+    process_name: str

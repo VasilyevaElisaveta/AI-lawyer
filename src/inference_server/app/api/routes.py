@@ -43,10 +43,21 @@ async def get_chat_name(
     llm: LLMService = Depends(get_llm_service)
 ):
     try:
-        chat_name = llm.aget_chat_name(request.raw_input)
+        result = await llm.aget_chat_name(request.raw_input)
+        response = result.get("response", {})
+        metadata = result.get("metadata", {})
+        chat_name = response.content
+        logger.debug(f"Got chat name: {chat_name}")
         return ChatNameResponse(
             chat_id=request.chat_id,
             chat_name=chat_name,
+            latency_ms=metadata.get("latency_ms", 0),
+            input_tokens=metadata.get("input_tokens", 0),
+            output_tokens=metadata.get("output_tokens", 0),
+            total_tokens=metadata.get("total_tokens", 0),
+            run_id=metadata.get("run_id"),
+            trace_id=metadata.get("trace_id"),
+            process_name="llm_service"
         )
     except Exception as e:
         logger.error(f"Ошибка при обработке запроса: {str(e)}", exc_info=True)
@@ -101,7 +112,6 @@ async def ainvoke_with_agent_type(
     Returns:
         ChatResponse с ответом и метаданными
     """
-    # Переопределяем agent_type из URL пути
     request.agent_type = agent_type
     try:
         logger.info(f"Получен запрос на агент: {agent_type}, thread_id={request.thread_id}")

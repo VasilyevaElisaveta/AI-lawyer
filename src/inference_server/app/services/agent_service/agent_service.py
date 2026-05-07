@@ -1,5 +1,4 @@
 import os
-from dotenv import load_dotenv
 
 from logger import LoggerFactory
 
@@ -18,7 +17,6 @@ logger = LoggerFactory.get_logger(
     logs_path=os.getenv("LOGS_DIR"),
     log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
-load_dotenv()
 
 
 def check_error(result):
@@ -182,15 +180,17 @@ class AgentService:
         return mapping.get(agent_type.lower(), None)
 
     def _to_response(self, result: dict) -> ChatResponse:
+        metadata = result.get("metadata", {})
         return ChatResponse(
             reply=result.get("reply", ""),
             handled_by_agent=result.get("handled_by_agent", True),
             document_created=result.get("document_created", False),
             is_error=result.get("is_error", False),
-            latency_ms=result.get("latency_ms", 0),
-            input_tokens=result.get("input_tokens", 0),
-            output_tokens=result.get("output_tokens", 0),
-            total_tokens=result.get("total_tokens", 0),
-            run_id=result.get("run_id"),
-            trace_id=result.get("trace_id"),
+            latency_ms=metadata.get("latency_ms", 0),
+            input_tokens=metadata.get("input_tokens", 0),
+            output_tokens=metadata.get("output_tokens", 0),
+            total_tokens=metadata.get("total_tokens", 0),
+            run_id=metadata.get("run_id"),
+            trace_id=metadata.get("trace_id"),
+            process_name=metadata.get("process_name", "unknown_process")
         )

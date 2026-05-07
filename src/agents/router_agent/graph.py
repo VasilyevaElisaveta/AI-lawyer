@@ -1,11 +1,22 @@
+import os
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
+from langchain_core.tracers.context import collect_runs
 
-from .nodes import classification_node, clear_previous_run_results
+from logger import LoggerFactory
+
+from .nodes import classification_node, clear_previous_run_results, clear_before_end
 from .state import RouterAgentState
+
+
+logger = logger = LoggerFactory.get_logger(
+    name=__name__,
+    logs_path=os.getenv("LOGS_DIR"),
+    log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
+)
 
 
 def create_graph(llm) -> StateGraph:
@@ -18,10 +29,15 @@ def create_graph(llm) -> StateGraph:
     После классификации граф завершает работу, передавая результат классификации.
     """
 
-    async def clear_node_wrapper(
+    async def clear_previous_node_wrapper(
         state: RouterAgentState,
     ) -> dict[str, Any]:
         return await clear_previous_run_results(state)
+    
+    async def clear_before_end_wrapper(
+        state: RouterAgentState,
+    ) -> dict[str, Any]:
+        return await clear_before_end(state)
 
     async def classification_node_wrapper(
         state: RouterAgentState, 
@@ -31,13 +47,14 @@ def create_graph(llm) -> StateGraph:
 
     graph = StateGraph(RouterAgentState)
 
-    graph.add_node("clear", clear_node_wrapper)
+    graph.add_node("clear_previous", clear_previous_node_wrapper)
+    graph.add_node("clear_before_end", clear_before_end_wrapper)
     graph.add_node("classification", classification_node_wrapper)
 
-    # Определяем рёбра
-    graph.add_edge(START, "clear")
-    graph.add_edge("clear", "classification")
-    graph.add_edge("classification", END)
+    graph.add_edge(START, "clear_previous")
+    graph.add_edge("clear_previous", "classification")
+    graph.add_edge("classification", "clear_before_end")
+    graph.add_edge("clear_before_end", END)
 
     return graph
 
@@ -62,14 +79,28 @@ class RouterAgent:
 
     async def process_user_message(self, raw_input: str, thread_id: str) -> dict:
         input_state = self._build_input_state(raw_input)
-        result = await self.graph.ainvoke(
-            input_state,
-            config={
-                "run_name": "RouterAgent",
-                "configurable": {
-                    "thread_id": thread_id
+        with collect_runs() as runs_cb:
+            response = await self.graph.ainvoke(
+                input_state,
+                config={
+                    "run_name": "RouterAgent",
+                    "configurable": {
+                        "thread_id": thread_id
+                    }
                 }
-            }
-        )
-        result["handled_by_agent"] = True
+            )
+        root_run = runs_cb.traced_runs[0]
+        usage = response.get("usage_metadata", {})
+        result = {
+            "response": response,
+            "metadata": {
+                "run_id": str(root_run.id),
+                "trace_id": str(root_run.trace_id),
+                "latency_ms": int((root_run.end_time - root_run.start_time).total_seconds() * 1000),
+                "input_tokens": int(usage.get("input_tokens", 0) or 0),
+                "output_tokens": int(usage.get("output_tokens", 0) or 0),
+                "total_tokens": int(usage.get("total_tokens", 0) or 0),
+            },
+        }
+        logger.debug(f"Got result: {result}")
         return result

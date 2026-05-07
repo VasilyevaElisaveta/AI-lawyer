@@ -8,8 +8,8 @@ services:
       additional_contexts:
         logger_lib: ../libs/logger
     container_name: ai-lawyer-inference-server
-    expose:
-      - "8000"
+    ports:
+      - 8000:8000
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/chat/health"]
       interval: 30s

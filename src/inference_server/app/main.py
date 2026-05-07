@@ -26,11 +26,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"Debug mode: {settings.DEBUG}")
     app.state.agent_service = AgentService()
 
+    llm_config={
+        "metadata": {
+            "ls_provider": "gigachat",
+            "ls_model_name": "GigaChat",
+        }
+    }
     llm_kwargs = {
         "credentials": os.getenv("SBER_AUTH"),
         **DEFAULT_GIGACHAT_PARAMS
     }
-    app.state.llm_service = LLMService("GigaChat", **llm_kwargs)
+    app.state.llm_service = LLMService("GigaChat", llm_config, **llm_kwargs)
 
     try:
         yield
