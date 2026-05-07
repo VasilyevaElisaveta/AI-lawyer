@@ -4,8 +4,9 @@
 import os
 import asyncio
 from typing import Any
+import hashlib
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
@@ -20,7 +21,7 @@ from .nodes import (
     generator_node,
     qa_node,
 )
-from .utils.docx_generator import generate_docx_base64
+from .utils.docx_generator import generate_docx_bytes, save_docx_file
 
 
 logger = LoggerFactory.get_logger(
@@ -123,7 +124,7 @@ class ClaimsAgent:
         if not document_text:
             return {
                 "final_document": "",
-                "document_base64": "",
+                "document_path": "",
                 "pipeline_status": "failed",
                 "error": "Документ не был сгенерирован",
             }
@@ -133,7 +134,7 @@ class ClaimsAgent:
                 "Досудебная претензия" if document_type == "complaint"
                 else "Исковое заявление"
             )
-            docx_base64 = generate_docx_base64(
+            docx_bytes = generate_docx_bytes(
                 document_text,
                 metadata={
                     "title": docx_title,
@@ -142,12 +143,27 @@ class ClaimsAgent:
                     "court": state.get("court_info", ""),
                 },
             )
+            h = hashlib.blake2b(docx_bytes, digest_size=os.getenv("HASH_LENGTH")).hexdigest()
 
-            logger.info("DOCX generated, base64 length: %d", len(docx_base64))
+            logger.info(f"DOCX generated, bytes length: {len(docx_bytes)}, hash: {h}")
+
+            docx_directory = (
+                f"{os.getenv('GENERATED_DOCX_PATH')}/"
+                f"{state.get('user_metadata', {}).get('user_id', 'unknown_user')}/"
+                f"{state.get('thread_id', 'unknown_thread')}"
+            )
+            os.makedirs(docx_directory, exist_ok=True)
+            docx_file = f"{docx_directory}/{h}.docx"
+            i = 1
+            while os.path.exists(docx_file):
+                docx_file = f"{docx_directory}/{h} ({i}).docx"
+                i += 1
+            with open(docx_file, "wb") as f:
+                f.write(docx_bytes)
 
             return {
                 "final_document": document_text,
-                "document_base64": docx_base64,
+                "document_path": docx_file,
                 "pipeline_status": "completed",
             }
 
@@ -155,7 +171,7 @@ class ClaimsAgent:
             logger.error("DOCX generation failed: %s", e, exc_info=True)
             return {
                 "final_document": document_text,
-                "document_base64": "",
+                "document_path": "",
                 "pipeline_status": "completed_with_errors",
                 "error": f"Ошибка генерации DOCX: {str(e)}",
             }
@@ -164,6 +180,7 @@ class ClaimsAgent:
         self,
         user_message: str,
         thread_id: str,
+        user_metadata: dict[str, Any]={},
         document_type: str = _DEFAULT_DOCUMENT_TYPE,
     ) -> dict[str, Any]:
         """
@@ -210,7 +227,7 @@ class ClaimsAgent:
 
             initial_state["document_type"] = document_type
             initial_state["request_id"] = thread_id
-            initial_state["user_id"] = thread_id
+            initial_state["user_metadata"] = user_metadata
 
             config = {"configurable": {"thread_id": thread_id}}
 
@@ -237,11 +254,11 @@ class ClaimsAgent:
         error = state.get("error", "")
         document_type = state.get("document_type", _DEFAULT_DOCUMENT_TYPE)
 
-        document_base64 = state.get("document_base64", "")
-        if document_base64:
+        document_path = state.get("document_path", "")
+        if document_path:
             return {
-                "reply": document_base64,
-                "handled_by_agent": "lawsuit",
+                "reply": document_path,
+                "handled_by_agent": True,
                 "document_created": True,
                 "document_type": document_type,
                 "status": pipeline_status,

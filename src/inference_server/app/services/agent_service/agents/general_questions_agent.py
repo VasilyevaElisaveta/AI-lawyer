@@ -1,8 +1,8 @@
 from typing import Any
 
-from .base import BaseGraphAgent
+from agents.general_questions_agent import GeneralQuestionsAgent
 
-from .....agents.general_questions_agent import GeneralQuestionsAgent
+from .base import BaseGraphAgent
 
 
 class GeneralQuestionsGraphAgent(BaseGraphAgent):

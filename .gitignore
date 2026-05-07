@@ -11,3 +11,8 @@ logs/
 
 # file storage
 storage/
+
+libs/**/src/*.egg-info/
+
+.vscode/*
+!.vscode/settings.json

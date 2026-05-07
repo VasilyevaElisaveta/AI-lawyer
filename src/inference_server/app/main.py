@@ -4,7 +4,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
+
+from agents.llm_client import DEFAULT_GIGACHAT_PARAMS
 
 from .api.routes import router
 from .core.settings import settings
@@ -23,7 +25,12 @@ async def lifespan(app: FastAPI):
     logger.info(f"=== {settings.APP_NAME} v{settings.APP_VERSION} запущен ===")
     logger.info(f"Debug mode: {settings.DEBUG}")
     app.state.agent_service = AgentService()
-    app.state.llm_service = LLMService()
+
+    llm_kwargs = {
+        "credentials": os.getenv("SBER_AUTH"),
+        **DEFAULT_GIGACHAT_PARAMS
+    }
+    app.state.llm_service = LLMService("GigaChat", **llm_kwargs)
 
     try:
         yield

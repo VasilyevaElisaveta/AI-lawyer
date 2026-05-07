@@ -1,6 +1,6 @@
 import os
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langchain_core.messages import AIMessage
 

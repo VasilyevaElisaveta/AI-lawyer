@@ -3,7 +3,7 @@ import base64
 import re
 from io import BytesIO
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH

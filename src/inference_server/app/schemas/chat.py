@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 
 
 class ChatNameRequest(BaseModel):
@@ -15,6 +15,7 @@ class ChatNameResponse(BaseModel):
 class ChatRequest(BaseModel):
     raw_input: str
     thread_id: str
+    user_metadata: Optional[dict[str, Any]] = {}
     agent_type: Optional[str] = None  # router_agent / contract_agent / claims_agent / general_questions_agent
 
 

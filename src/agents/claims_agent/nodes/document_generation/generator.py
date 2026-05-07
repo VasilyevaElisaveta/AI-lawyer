@@ -4,13 +4,13 @@
 import os
 from typing import Any
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from claims_agent.state import ClaimsAgentState
-from claims_agent.services.llm_client import invoke_llm
-from claims_agent.prompts import (
+from ...state import ClaimsAgentState
+from ...services.llm_client import invoke_llm
+from ...prompts import (
     GENERATOR_HUMAN,
     GENERATOR_REWORK_HUMAN,
     GENERATOR_SYSTEM,

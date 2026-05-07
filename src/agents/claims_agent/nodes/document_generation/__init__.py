@@ -1,10 +1,8 @@
-from claims_agent.nodes.document_generation.intake import intake_node
-from claims_agent.nodes.classification.classification import classification_node
-from claims_agent.nodes.validation.validation import validation_node
-from claims_agent.nodes.document_generation.research import research_node
-from claims_agent.nodes.document_generation.calc import calculator_node
-from claims_agent.nodes.document_generation.generator import generator_node
-from claims_agent.nodes.document_generation.qa import qa_node
+from .intake import intake_node
+from .research import research_node
+from .calc import calculator_node
+from .generator import generator_node
+from .qa import qa_node
 
 __all__ = [
     "intake_node",

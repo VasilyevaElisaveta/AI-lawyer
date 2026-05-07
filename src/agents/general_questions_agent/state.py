@@ -1,4 +1,4 @@
-from typing import Annotated, TypedDict, Optional
+from typing import Annotated, TypedDict, Optional, Any
 
 from langgraph.graph.message import add_messages
 
@@ -20,3 +20,4 @@ class GeneralQuestionAgentState(TypedDict, total=False):
     # ── Финальный результат ────────────────────────────────
     reply: Optional[str]                      # ответ пользователю
     error: Optional[str]
+    usage_metadata: Optional[dict[str, Any]]

@@ -17,6 +17,8 @@ class ClaimsAgentState(TypedDict, total=False):
     # ── Сообщения (для будущего диалогового intake) ───────────
     messages: Annotated[list, add_messages]
 
+    user_metadata: dict[str, Any]
+
     # ── Входные данные ────────────────────────────────────────
     raw_input: str                  # свободный текст от пользователя
     input_data: dict[str, Any]      # структурированный ввод (от маршрутизатора)
@@ -93,6 +95,6 @@ class ClaimsAgentState(TypedDict, total=False):
 
     # ── Финальный результат ───────────────────────────────────
     final_document: str             # Текстовая версия документа
-    document_base64: str            # DOCX в base64 (для передачи клиенту)
+    document_path: str
     pipeline_status: str            # "in_progress" | "completed" | "completed_with_errors" | "failed"
     error: str                      # Описание ошибки (если есть)

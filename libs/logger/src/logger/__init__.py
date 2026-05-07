@@ -1,4 +1,4 @@
-from .logger import LoggerFactory
+from .core import LoggerFactory
 
 __all__ = [
     "LoggerFactory"

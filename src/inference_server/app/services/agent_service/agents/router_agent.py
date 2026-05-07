@@ -1,8 +1,8 @@
 from typing import Any
 
-from .base import BaseGraphAgent
+from agents.router_agent import RouterAgent
 
-from .....agents.router_agent import RouterAgent
+from .base import BaseGraphAgent
 
 
 class RouterGraphAgent(BaseGraphAgent):

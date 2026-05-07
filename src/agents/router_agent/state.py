@@ -28,4 +28,6 @@ class RouterAgentState(TypedDict, total=False):
     is_implemented: bool             # реализован ли обработчик для категории
     error: Optional[str]
 
-    routed_to: Optional[str]                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "general_question_agent", "none"
+    routed_to: Optional[str]                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "general_question_agent", None
+    
+    usage_metadata: Optional[dict[str, Any]]

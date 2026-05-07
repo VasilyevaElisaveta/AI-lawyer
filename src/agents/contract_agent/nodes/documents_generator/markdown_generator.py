@@ -3,7 +3,7 @@ import json
 import re
 from typing import Any
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig

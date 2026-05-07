@@ -7,7 +7,7 @@ import io
 import unicodedata
 from typing import Any
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from docx import Document
 from docx.shared import Pt, Inches
@@ -21,7 +21,7 @@ logger = LoggerFactory.get_logger(
 )
 
 
-def generate_docx_base64(document_text: str, metadata: dict[str, Any] | None = None) -> str:
+def generate_docx_bytes(document_text: str, metadata: dict[str, Any] | None = None) -> str:
     """
     Генерирует DOCX-файл из текста и возвращает base64-строку.
 
@@ -78,7 +78,7 @@ def generate_docx_base64(document_text: str, metadata: dict[str, Any] | None = N
 
     logger.info("DOCX generated, size: %d bytes, base64 length: %d", len(docx_bytes), len(docx_base64))
 
-    return docx_base64
+    return docx_bytes
 
 
 def _extract_short_name(full_info: str, max_length: int = 80) -> str:
@@ -166,3 +166,8 @@ def _add_formatted_content(doc: Document, text: str) -> None:
         run.font.size = Pt(14)
         p.paragraph_format.line_spacing = 1.5
         p.paragraph_format.first_line_indent = Inches(0.5)  # Абзацный отступ
+
+
+def save_docx_file(bytes: bytes, path: str) -> None:
+    with open(path, "wb") as f:
+        f.write(bytes)

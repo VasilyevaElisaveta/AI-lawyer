@@ -1,0 +1,8 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/libs/logger/src"
+  ],
+  "python.autoComplete.extraPaths": [
+    "${workspaceFolder}/libs/logger/src"
+  ]
+}

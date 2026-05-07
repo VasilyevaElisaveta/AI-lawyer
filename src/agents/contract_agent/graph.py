@@ -4,11 +4,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 
+from memory import memory_node
+
 from .nodes import *
 from .state import ContractAgentState
-
-from ...memory import memory_node
-
 
 def create_graph(llm, generator_llm=None) -> StateGraph:
     """Создаёт граф агента."""

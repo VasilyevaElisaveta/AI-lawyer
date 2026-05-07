@@ -1,16 +1,16 @@
 import os
 from dotenv import load_dotenv
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
+
+from agents.llm_client import create_gigachat, DEFAULT_GIGACHAT_PARAMS
 
 from .agents.contract_agent import ContractGraphAgent
 from .agents.claims_agent import ClaimsGraphAgent
 from .agents.general_questions_agent import GeneralQuestionsGraphAgent
 from .agents.router_agent import RouterGraphAgent
 
-from ..schemas.chat import ChatRequest, ChatResponse
-
-from ....agents.llm_client import create_gigachat, DEFAULT_GIGACHAT_PARAMS
+from ...schemas.chat import ChatRequest, ChatResponse
 
 
 logger = LoggerFactory.get_logger(
@@ -37,33 +37,69 @@ class AgentService:
     
     def __init__(self):
         logger.info("Инициализация AgentService...")
+        router_config={
+            "metadata": {
+                "ls_provider": "gigachat",
+                "ls_model_name": "GigaChat",
+            }
+        }
         router_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
             **DEFAULT_GIGACHAT_PARAMS
+        }
+        contract_config={
+            "metadata": {
+                "ls_provider": "gigachat",
+                "ls_model_name": "GigaChat",
+            }
         }
         contract_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
             **DEFAULT_GIGACHAT_PARAMS
         }
+        contract_generator_config={
+            "metadata": {
+                "ls_provider": "gigachat",
+                "ls_model_name": "GigaChat",
+            }
+        }
         contract_generator_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
             **DEFAULT_GIGACHAT_PARAMS,
-            "max_tokens":500
+            "max_tokens": 500
+        }
+        claims_config={
+            "metadata": {
+                "ls_provider": "gigachat",
+                "ls_model_name": "GigaChat",
+            }
         }
         claims_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
             **DEFAULT_GIGACHAT_PARAMS
+        }
+        contract_generator_config={
+            "metadata": {
+                "ls_provider": "gigachat",
+                "ls_model_name": "GigaChat",
+            }
+        }
+        general_questions_config={
+            "metadata": {
+                "ls_provider": "gigachat",
+                "ls_model_name": "GigaChat",
+            }
         }
         general_questions_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
             **DEFAULT_GIGACHAT_PARAMS
         }
 
-        router_llm = create_gigachat("GigaChat", **router_kwargs)
-        contract_llm = create_gigachat("GigaChat", **contract_kwargs)
-        contract_generator_llm = create_gigachat("GigaChat", **contract_generator_kwargs)
-        general_questions_llm = create_gigachat("GigaChat", **general_questions_kwargs)
-        claims_llm = create_gigachat("GigaChat", **claims_kwargs)
+        router_llm = create_gigachat("GigaChat", config=router_config, **router_kwargs)
+        contract_llm = create_gigachat("GigaChat", config=contract_config, **contract_kwargs)
+        contract_generator_llm = create_gigachat("GigaChat", config=contract_generator_config, **contract_generator_kwargs)
+        claims_llm = create_gigachat("GigaChat", config=claims_config, **claims_kwargs)
+        general_questions_llm = create_gigachat("GigaChat", config=general_questions_config, **general_questions_kwargs)
 
         self.router_agent = RouterGraphAgent(router_llm)
         self.contract_agent = ContractGraphAgent(contract_llm, generator_llm=contract_generator_llm)
@@ -109,7 +145,11 @@ class AgentService:
                 result = await self.contract_agent.run(request.raw_input, request.thread_id)
             if route == "claims_agent":
                 logger.info("Маршрутизация на claims_agent...")
-                result = await self.claims_agent.run(request.raw_input, request.thread_id)
+                result = await self.claims_agent.run(
+                    request.raw_input,
+                    request.thread_id, 
+                    user_metadata=request.user_metadata
+                )
             elif route == "general_questions_agent":
                 logger.info("Маршрутизация на general_agent...")
                 result = await self.general_questions_agent.run(request.raw_input, request.thread_id)
@@ -146,5 +186,11 @@ class AgentService:
             reply=result.get("reply", ""),
             handled_by_agent=result.get("handled_by_agent", True),
             document_created=result.get("document_created", False),
-            is_error=result.get("is_error", True)
+            is_error=result.get("is_error", False),
+            latency_ms=result.get("latency_ms", 0),
+            input_tokens=result.get("input_tokens", 0),
+            output_tokens=result.get("output_tokens", 0),
+            total_tokens=result.get("total_tokens", 0),
+            run_id=result.get("run_id"),
+            trace_id=result.get("trace_id"),
         )

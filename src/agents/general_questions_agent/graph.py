@@ -4,10 +4,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 
+from memory import memory_node
+
 from .nodes import answer_node, clear_previous_run_results
 from .state import GeneralQuestionAgentState
-
-from ...memory import memory_node
 
 
 def create_graph(llm) -> StateGraph:
@@ -30,7 +30,7 @@ def create_graph(llm) -> StateGraph:
 
     graph = StateGraph(GeneralQuestionAgentState)
 
-    graph.add_edge("clear", clear_results_wrapper)
+    graph.add_node("clear", clear_results_wrapper)
     graph.add_node("memory", memory_node_wrapper)
     graph.add_node("answer", answer_node_wrapper)
 

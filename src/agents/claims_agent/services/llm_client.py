@@ -5,12 +5,12 @@ import os
 import time
 from functools import lru_cache
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langchain_gigachat import GigaChat
 from langchain_core.messages import BaseMessage
 
-from claims_agent.config import get_settings
+from ..config import get_settings
 
 
 logger = LoggerFactory.get_logger(

@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -23,11 +23,12 @@ async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:
         "error": None,
         "reply": None,
         "raw_input": None,
+        "usage_metadata": None,
     }
 
 
 async def answer_node(
-    state: GeneralQuestionAgentState, 
+    state: GeneralQuestionAgentState,
     llm,
     config: RunnableConfig | None = None
 ) -> Dict[str, Any]:
@@ -45,7 +46,7 @@ async def answer_node(
     """
     logger.info("Start")
     user_question = state.get("raw_input", "")
-    
+
     if not user_question:
         return {
             "error": "[general_questions_agent] empty input",
@@ -53,13 +54,15 @@ async def answer_node(
     
     prompt = render_template(ANSWER_PROMPT, {"user_question": user_question})
     try:
-        response = await llm.ainvoke([
-            SystemMessage(content=ANSWER_SYSTEM),
-            HumanMessage(content=prompt),
-        ],
-        config=config
+        response = await llm.ainvoke(
+            [
+                SystemMessage(content=ANSWER_SYSTEM),
+                HumanMessage(content=prompt),
+            ],
+            config=config
         )
         reply = response.content
+        usage_metadata = getattr(response, "usage_metadata", None) or {}
     except Exception as e:
         return {
             "error": "[general_questions_agent] ainvoke error",
@@ -72,4 +75,5 @@ async def answer_node(
     return {
         "reply": reply,
         "messages": messages,
+        "usage_metadata": usage_metadata,
     }

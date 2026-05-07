@@ -19,6 +19,7 @@ DEFAULT_GIGACHAT_PARAMS = {
 def create_gigachat(
     model: str,
     temperature: float | None = None,
+    config=None,
     **kwargs,
 ) -> GigaChat:
     params = {
@@ -34,4 +35,7 @@ def create_gigachat(
     if unknown:
         raise TypeError(f"Unsupported GigaChat arguments: {sorted(unknown)}")
 
-    return GigaChat(**params)
+    llm = GigaChat(**params)
+    if config is not None:
+        llm = llm.with_config(**config)
+    return llm

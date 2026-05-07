@@ -7,20 +7,21 @@ import json
 import re
 from typing import Any
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from claims_agent.state import ClaimsAgentState
-from claims_agent.services.llm_client import invoke_llm
-from claims_agent.prompts import (
+from .calc import _fmt
+
+from ...state import ClaimsAgentState
+from ...services.llm_client import invoke_llm
+from ...prompts import (
     QA_HUMAN,
     QA_SYSTEM,
     COMPLAINT_QA_HUMAN,
     COMPLAINT_QA_SYSTEM,
     render_template,
 )
-from claims_agent.nodes.document_generation.calc import _fmt
 
 
 logger = LoggerFactory.get_logger(

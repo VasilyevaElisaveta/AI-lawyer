@@ -2,7 +2,7 @@ import os
 import re
 from typing import Literal
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from .documents_templates import CONTRACT_TEMPLATES
 

@@ -1,8 +1,8 @@
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
+
+from agents.llm_client import create_gigachat
 
 from .prompts import CHAT_NAME_PROMPT, CHAT_NAME_SYSTEM
-
-from .....agents.llm_client import create_gigachat
 
 
 class LLMService:

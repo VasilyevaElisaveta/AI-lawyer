@@ -1,6 +1,6 @@
 import os
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from ....utils import messages_to_str, documents_to_str
 

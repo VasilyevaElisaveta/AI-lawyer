@@ -1,6 +1,8 @@
 import json
 from typing import Any, Dict, Literal
 
+from logger import LoggerFactory
+
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 
@@ -8,8 +10,6 @@ from .prompts import CLASSIFY_SYSTEM, CLASSIFY_PROMPT, EXTRACT_SYSTEM, EXTRACT_P
 from .contract_fields import CONTRACT_FIELDS
 
 from ....utils import safe_parse_json, messages_to_str
-
-from .....utils import LoggerFactory
 
 
 logger = LoggerFactory.get_logger("ContractAgentDocumentGeneratorIntakeNode")

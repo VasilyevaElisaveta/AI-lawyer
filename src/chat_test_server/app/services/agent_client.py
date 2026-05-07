@@ -4,7 +4,7 @@ from uuid import uuid4
 import httpx
 from pydantic import BaseModel
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 
 logger = LoggerFactory.get_logger(

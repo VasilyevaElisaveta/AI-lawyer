@@ -2,7 +2,7 @@ import os
 from datetime import datetime
 from typing import Dict, Any
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 

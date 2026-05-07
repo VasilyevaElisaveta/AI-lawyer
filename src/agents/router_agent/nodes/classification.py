@@ -1,7 +1,7 @@
 import os
 from typing import Any, Dict
 
-from libs.logger import LoggerFactory
+from logger import LoggerFactory
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
@@ -29,6 +29,7 @@ async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:
         "error": None,
         "routed_to": None,
         "is_implemented": None,
+        "usage_metadata": None,
     }
 
 
@@ -56,10 +57,12 @@ async def classification_node(
             "error": "[router_agent] empty input",
         }
     
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", ROUTER_CLASSIFICATION_SYSTEM),
-        ("human", ROUTER_CLASSIFICATION_PROMPT)
-    ])
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", ROUTER_CLASSIFICATION_SYSTEM),
+            ("human", ROUTER_CLASSIFICATION_PROMPT)
+        ]
+    )
     
     chain = prompt | llm
     try:
@@ -70,6 +73,7 @@ async def classification_node(
         )
         raw = response.content
         classification_result = safe_parse_json(raw)
+        usage_metadata = getattr(response, "usage_metadata", None) or {}
     except Exception as e:
         return {
             "error": "[router_agent] ainvoke error",
@@ -94,6 +98,7 @@ async def classification_node(
         "classification_confidence": confidence,
         "classification_result": classification_result,
         "is_implemented": is_implemented,
+        "usage_metadata": usage_metadata,
     }
     
     if not is_implemented:
