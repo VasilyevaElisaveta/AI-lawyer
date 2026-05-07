@@ -91,7 +91,7 @@ class GeneralQuestionsAgent:
                     }
                 }
             )
-        root_run = runs_cb.traced_runs[0]
+        root_run = runs_cb.traced_runs[-1]
         logger.debug(f"Got response: {response}")
         usage = response.get("usage_metadata", {})
         result = {

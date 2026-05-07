@@ -13,7 +13,7 @@ from .prompts import (
 
 from ..state import RouterAgentState
 
-from ...utils import safe_parse_json
+from ...utils import safe_parse_json, update_tokens_metadata
 
 
 logger = LoggerFactory.get_logger(
@@ -78,7 +78,13 @@ async def classification_node(
         )
         raw = response.content
         classification_result = safe_parse_json(raw)
-        usage_metadata = getattr(response, "usage_metadata", None) or {}
+        usage_metadata = getattr(response, "usage_metadata", {})
+        previous_usage_metadata = state.get("usage_metadata", {})
+        usage_metadata = update_tokens_metadata(
+            previous_usage_metadata, 
+            usage_metadata, 
+            ["input_tokens", "output_tokens", "total_tokens"]
+        )
     except Exception as e:
         return {
             "error": "[router_agent] ainvoke error",

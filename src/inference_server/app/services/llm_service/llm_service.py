@@ -37,7 +37,7 @@ class LLMService:
                     "run_name": "GeneralQuestionAgent",
                 },
             )
-        root_run = runs_cb.traced_runs[0]
+        root_run = runs_cb.traced_runs[-1]
         usage = response.usage_metadata or {}
         result = {
             "response": response,

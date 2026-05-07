@@ -13,6 +13,7 @@ class GeneralQuestionAgentState(TypedDict, total=False):
 
     # ── Сообщения (для диалогового контекста) ─────────────
     messages: Annotated[list, add_messages]
+    conversation_summary: str
 
     # ── Входные данные ────────────────────────────────────
     raw_input: Optional[str]                  # вопрос пользователя

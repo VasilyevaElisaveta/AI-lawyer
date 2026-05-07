@@ -89,7 +89,7 @@ class RouterAgent:
                     }
                 }
             )
-        root_run = runs_cb.traced_runs[0]
+        root_run = runs_cb.traced_runs[-1]
         usage = response.get("usage_metadata", {})
         result = {
             "response": response,

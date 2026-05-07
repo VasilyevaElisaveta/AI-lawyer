@@ -40,12 +40,15 @@ async def memory_node(
 
     previous_summary = state.get("conversation_summary")
 
-    summary = await summarize_messages(
+    summary, metadata = await summarize_messages(
+        state,
         old_messages,
         llm,
         previous_summary,
         config=config
     )
+
+    state["usage_metadata"] = metadata
 
     state["conversation_summary"] = summary
 

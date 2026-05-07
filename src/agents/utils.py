@@ -83,6 +83,13 @@ def messages_to_str(messages) -> str:
     return "\n".join(formatted_messages)
 
 
+def update_tokens_metadata(m1, m2, fields):
+    for key in fields:
+        if key in m2:
+            m2[key] += m1.get(key, 0)
+    return m2
+
+
 def documents_to_str(documents: List[str]) -> str:
     formatted_messages = []
     for i, document in enumerate(documents):

@@ -5,4 +5,11 @@ ANSWER_SYSTEM = (
     "Если вопрос выходит за рамки, предложи переформулировать или обратиться к специалисту."
 )
 
-ANSWER_PROMPT = "{user_question}"
+ANSWER_PROMPT = \
+"""
+{user_question}
+Несколько предыдущих сообщений:
+{messages_str}
+Суммаризация диалога (если есть):
+{conversation_summary}
+"""
