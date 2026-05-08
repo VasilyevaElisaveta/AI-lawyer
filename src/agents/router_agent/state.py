@@ -30,4 +30,4 @@ class RouterAgentState(TypedDict, total=False):
 
     routed_to: Optional[str]                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "general_question_agent", None
     
-    usage_metadata: Optional[dict[str, Any]]
+    usage_metadata: dict[str, Any]

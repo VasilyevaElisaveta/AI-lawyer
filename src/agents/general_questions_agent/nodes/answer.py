@@ -82,7 +82,7 @@ async def answer_node(
         )
         reply = response.content
         usage_metadata = getattr(response, "usage_metadata", None) or {}
-        previous_usage_metadata = state.get("usage_metadata", {})
+        previous_usage_metadata = state.get("usage_metadata", {}) or {}
         usage_metadata = update_tokens_metadata(
             previous_usage_metadata, 
             usage_metadata, 

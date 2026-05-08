@@ -90,6 +90,7 @@ class RouterAgent:
                 }
             )
         root_run = runs_cb.traced_runs[-1]
+        logger.debug(f"RESPONSE: {response}")
         usage = response.get("usage_metadata", {})
         result = {
             "response": response,

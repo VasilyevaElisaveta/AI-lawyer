@@ -28,7 +28,7 @@ async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:
         "error": None,
         "routed_to": None,
         "is_implemented": None,
-        "usage_metadata": None,
+        "usage_metadata": {},
     }
 
 
@@ -71,21 +71,23 @@ async def classification_node(
     
     chain = prompt | llm
     try:
-        response = await chain.ainvoke({
-            "raw_input": raw_input
-        },
-        config=config
+        response = await chain.ainvoke(
+            {
+                "raw_input": raw_input
+            },
+            config=config
         )
         raw = response.content
         classification_result = safe_parse_json(raw)
         usage_metadata = getattr(response, "usage_metadata", {})
-        previous_usage_metadata = state.get("usage_metadata", {})
+        previous_usage_metadata = state.get("usage_metadata", {}) or {}
         usage_metadata = update_tokens_metadata(
             previous_usage_metadata, 
             usage_metadata, 
             ["input_tokens", "output_tokens", "total_tokens"]
         )
     except Exception as e:
+        logger.error(f"Got error {e}")
         return {
             "error": "[router_agent] ainvoke error",
         }

@@ -21,4 +21,4 @@ class GeneralQuestionAgentState(TypedDict, total=False):
     # ── Финальный результат ────────────────────────────────
     reply: Optional[str]                      # ответ пользователю
     error: Optional[str]
-    usage_metadata: Optional[dict[str, Any]]
+    usage_metadata: dict[str, Any]
