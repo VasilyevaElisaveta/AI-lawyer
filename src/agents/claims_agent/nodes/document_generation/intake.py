@@ -11,9 +11,9 @@ from typing import Any
 from logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from ...state import ClaimsAgentState
-from ...services.llm_client import invoke_llm
 from ...prompts import (
     INTAKE_HUMAN,
     INTAKE_SYSTEM,
@@ -58,7 +58,11 @@ _FIELD_MAP: dict[str, str] = {
 }
 
 
-def intake_node(state: ClaimsAgentState) -> dict[str, Any]:
+def intake_node(
+    state: ClaimsAgentState,
+    llm,
+    config: RunnableConfig,    
+) -> dict[str, Any]:
     """Узел графа: сбор и структурирование входных данных."""
     logger.info("Intake node started")
 
@@ -75,7 +79,7 @@ def intake_node(state: ClaimsAgentState) -> dict[str, Any]:
         return {"error": "Нет входных данных. Передайте raw_input или input_data."}
 
     logger.info("  Raw text detected — extracting via LLM")
-    return _extract_from_text(raw_input, state)
+    return _extract_from_text(raw_input, state, llm, config)
 
 
 # ── Вспомогательные функции ───────────────────────────────────
@@ -88,7 +92,12 @@ def _map_structured(data: dict) -> dict[str, Any]:
     return updates
 
 
-def _extract_from_text(text: str, state: ClaimsAgentState) -> dict[str, Any]:
+def _extract_from_text(
+    text: str, 
+    state: ClaimsAgentState,
+    llm,
+    config: RunnableConfig,
+) -> dict[str, Any]:
     # Если это повторная попытка — добавляем контекст ошибок
     validation_errors = state.get("validation_errors", [])
     additional = ""
@@ -105,10 +114,14 @@ def _extract_from_text(text: str, state: ClaimsAgentState) -> dict[str, Any]:
     )
 
     try:
-        content = invoke_llm([
-            SystemMessage(content=INTAKE_SYSTEM),
-            HumanMessage(content=prompt_text),
-        ])
+        response = llm.invoke(
+            [
+                SystemMessage(content=INTAKE_SYSTEM),
+                HumanMessage(content=prompt_text),
+            ],
+            config=config,
+        )
+        content = response.content
         data = _parse_json(content)
         return _map_structured(data)
 

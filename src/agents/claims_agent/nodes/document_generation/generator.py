@@ -7,9 +7,9 @@ from typing import Any
 from logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from ...state import ClaimsAgentState
-from ...services.llm_client import invoke_llm
 from ...prompts import (
     GENERATOR_HUMAN,
     GENERATOR_REWORK_HUMAN,
@@ -34,6 +34,7 @@ def generator_node(state: ClaimsAgentState) -> dict[str, Any]:
     logger.info("Generator node started (document_type=%s)", document_type)
 
     if document_type == "complaint":
+        pass
         return _generate_complaint(state)
     return _generate_lawsuit(state)
 
@@ -42,7 +43,11 @@ def generator_node(state: ClaimsAgentState) -> dict[str, Any]:
 #  Генерация искового заявления (существующая логика)
 # ═══════════════════════════════════════════════════════════════
 
-def _generate_lawsuit(state: ClaimsAgentState) -> dict[str, Any]:
+def _generate_lawsuit(
+        state: ClaimsAgentState,
+        llm,
+        config: RunnableConfig
+    ) -> dict[str, Any]:
     """Генерация искового заявления."""
     qa_feedback = state.get("qa_feedback", "")
     qa_attempts = state.get("qa_attempts", 0)
@@ -66,10 +71,14 @@ def _generate_lawsuit(state: ClaimsAgentState) -> dict[str, Any]:
         system = GENERATOR_SYSTEM
 
     try:
-        content = invoke_llm([
-            SystemMessage(content=system),
-            HumanMessage(content=prompt),
-        ])
+        response = llm.invoke(
+            [
+                SystemMessage(content=system),
+                HumanMessage(content=prompt),
+            ],
+            config=config,
+        )
+        content = response.content
         logger.info("  Lawsuit generated, length: %d chars", len(content))
         return {"generated_document": content}
     except Exception as e:
@@ -81,7 +90,11 @@ def _generate_lawsuit(state: ClaimsAgentState) -> dict[str, Any]:
 #  Генерация претензии
 # ═══════════════════════════════════════════════════════════════
 
-def _generate_complaint(state: ClaimsAgentState) -> dict[str, Any]:
+def _generate_complaint(
+        state: ClaimsAgentState,
+        llm,
+        config: RunnableConfig
+    ) -> dict[str, Any]:
     """Генерация досудебной претензии."""
     qa_feedback = state.get("qa_feedback", "")
     qa_attempts = state.get("qa_attempts", 0)
@@ -105,10 +118,13 @@ def _generate_complaint(state: ClaimsAgentState) -> dict[str, Any]:
         system = COMPLAINT_GENERATOR_SYSTEM
 
     try:
-        content = invoke_llm([
-            SystemMessage(content=system),
-            HumanMessage(content=prompt),
-        ])
+        content = llm.invoke(
+            [
+                SystemMessage(content=system),
+                HumanMessage(content=prompt),
+            ],
+            config=config,
+        )
         logger.info("  Complaint generated, length: %d chars", len(content))
         return {"generated_document": content}
     except Exception as e:

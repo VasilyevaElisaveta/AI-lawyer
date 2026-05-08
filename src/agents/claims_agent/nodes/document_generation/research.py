@@ -4,20 +4,18 @@
 Будущее: RAG по векторной БД с кодексами и законами.
 """
 import os
-import json
-import re
 from typing import Any
 
 from logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from ...state import ClaimsAgentState
-from ...services.llm_client import invoke_llm
 from ...prompts import (
     RESEARCH_HUMAN,
     RESEARCH_SYSTEM,
-    render_template,
+    render_template
 )
 
 
@@ -33,7 +31,11 @@ _CASE_TYPE_LABELS = {
 }
 
 
-def research_node(state: ClaimsAgentState) -> dict[str, Any]:
+def research_node(
+        state: ClaimsAgentState,
+        llm,
+        config: RunnableConfig,
+    ) -> dict[str, Any]:
     """Узел графа: определение применимых норм права."""
     logger.info("Research node started")
 
@@ -51,10 +53,14 @@ def research_node(state: ClaimsAgentState) -> dict[str, Any]:
     )
 
     try:
-        content = invoke_llm([
-            SystemMessage(content=RESEARCH_SYSTEM),
-            HumanMessage(content=prompt),
-        ])
+        response = llm.invoke(
+            [
+                SystemMessage(content=RESEARCH_SYSTEM),
+                HumanMessage(content=prompt),
+            ],
+            config=config,
+        )
+        content = response.content
         data = _parse_research(content)
         logger.info("  Research completed, laws length: %d chars", len(data.get("applicable_laws", "")))
         return data

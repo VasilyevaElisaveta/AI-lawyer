@@ -4,11 +4,11 @@ from typing import Optional, Any
 
 class ChatNameRequest(BaseModel):
     raw_input: str
-    chat_id: str
+    thread_id: str
 
 
 class ChatNameResponse(BaseModel):
-    chat_id: str
+    thread_id: str
     chat_name: str
     latency_ms: int
     input_tokens: int

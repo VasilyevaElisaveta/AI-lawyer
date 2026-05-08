@@ -10,11 +10,11 @@ from typing import Any
 from logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from .calc import _fmt
 
 from ...state import ClaimsAgentState
-from ...services.llm_client import invoke_llm
 from ...prompts import (
     QA_HUMAN,
     QA_SYSTEM,
@@ -33,7 +33,11 @@ logger = LoggerFactory.get_logger(
 _QA_PASS_THRESHOLD = 7  # минимальный балл для прохождения
 
 
-def qa_node(state: ClaimsAgentState) -> dict[str, Any]:
+def qa_node(
+    state: ClaimsAgentState,
+    llm,
+    config: RunnableConfig
+) -> dict[str, Any]:
     """Узел графа: рецензирование сгенерированного документа."""
     document_type = state.get("document_type", "lawsuit")
     logger.info("QA node started (document_type=%s)", document_type)
@@ -50,15 +54,21 @@ def qa_node(state: ClaimsAgentState) -> dict[str, Any]:
         }
 
     if document_type == "complaint":
-        return _qa_complaint(state, document, qa_attempts)
-    return _qa_lawsuit(state, document, qa_attempts)
+        return _qa_complaint(state, document, qa_attempts, llm, config)
+    return _qa_lawsuit(state, document, qa_attempts, llm, config)
 
 
 # ═══════════════════════════════════════════════════════════════
 #  QA для искового заявления
 # ═══════════════════════════════════════════════════════════════
 
-def _qa_lawsuit(state: ClaimsAgentState, document: str, qa_attempts: int) -> dict[str, Any]:
+def _qa_lawsuit(
+    state: ClaimsAgentState, 
+    document: str, 
+    qa_attempts: int,
+    llm, 
+    config: RunnableConfig,
+) -> dict[str, Any]:
     def _amount(key: str) -> str:
         val = state.get(key, 0)
         if isinstance(val, (int, float)) and val > 0:
@@ -84,14 +94,20 @@ def _qa_lawsuit(state: ClaimsAgentState, document: str, qa_attempts: int) -> dic
         },
     )
 
-    return _run_qa(QA_SYSTEM, prompt, qa_attempts, "lawsuit")
+    return _run_qa(QA_SYSTEM, prompt, qa_attempts, "lawsuit", llm, config)
 
 
 # ═══════════════════════════════════════════════════════════════
 #  QA для претензии
 # ═══════════════════════════════════════════════════════════════
 
-def _qa_complaint(state: ClaimsAgentState, document: str, qa_attempts: int) -> dict[str, Any]:
+def _qa_complaint(
+    state: ClaimsAgentState, 
+    document: str, 
+    qa_attempts: int,
+    llm, 
+    config: RunnableConfig,
+) -> dict[str, Any]:
     def _amount(key: str) -> str:
         val = state.get(key, 0)
         if isinstance(val, (int, float)) and val > 0:
@@ -117,7 +133,7 @@ def _qa_complaint(state: ClaimsAgentState, document: str, qa_attempts: int) -> d
         },
     )
 
-    return _run_qa(COMPLAINT_QA_SYSTEM, prompt, qa_attempts, "complaint")
+    return _run_qa(COMPLAINT_QA_SYSTEM, prompt, qa_attempts, "complaint", llm, config)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -129,12 +145,18 @@ def _run_qa(
     human_prompt: str,
     qa_attempts: int,
     doc_type: str,
+    llm,
+    config: RunnableConfig
 ) -> dict[str, Any]:
     try:
-        content = invoke_llm([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=human_prompt),
-        ])
+        response = llm.invoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=human_prompt),
+            ],
+            config=config,
+        )
+        content = response.content
         result = _parse_qa(content)
         passed = result.get("passed", False) and result.get("score", 0) >= _QA_PASS_THRESHOLD
 

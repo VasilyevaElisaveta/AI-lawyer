@@ -100,12 +100,12 @@ async def classification_node(
     category = classification_result.get("category", "general_question")
     confidence = classification_result.get("confidence", 0.0)
     
-    implemented_categories = {"lawsuit", "general_question"}
+    implemented_categories = {"claim", "general_question"}
     is_implemented = category in implemented_categories
     
     result: Dict[str, Any] = {
         "routed_to": {
-            "lawsuit": "lawsuit_agent",
+            "claim": "claims_agent",
             "general_question": "general_questions_agent",
         }.get(category, None),
         "classification_confidence": confidence,

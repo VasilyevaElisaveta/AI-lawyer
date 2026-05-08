@@ -49,7 +49,7 @@ async def get_chat_name(
         chat_name = response.content
         logger.debug(f"Got chat name: {chat_name}")
         return ChatNameResponse(
-            chat_id=request.chat_id,
+            thread_id=request.thread_id,
             chat_name=chat_name,
             latency_ms=metadata.get("latency_ms", 0),
             input_tokens=metadata.get("input_tokens", 0),

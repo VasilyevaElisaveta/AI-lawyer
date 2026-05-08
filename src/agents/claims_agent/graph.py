@@ -10,6 +10,7 @@ from logger import LoggerFactory
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
+from langchain_core.runnables import RunnableConfig
 
 from .state import ClaimsAgentState
 from .nodes import (
@@ -40,23 +41,56 @@ class ClaimsAgent:
     Агент для генерации юридических документов: исков и досудебных претензий.
     """
 
-    def __init__(self):
-        self.graph = self._build_graph()
+    def __init__(self, llm):
+        self.llm = llm
+        self.memory = MemorySaver()
+        # В проде заменить на RedisSaver или другое долговременное хранилище.
+        # from langgraph.checkpoint.redis import RedisSaver
+        # self.memory = RedisSaver.from_conn_string(
+        #     "redis://localhost:6379",
+        #     key_prefix=f"contract_agent:"
+        # )
+        self.graph = self._build_graph(llm)
         logger.info("ClaimsAgent initialized")
 
-    def _build_graph(self) -> Any:
+    def _build_graph(self, llm) -> Any:
         """Строит граф обработки."""
+
+        def intake_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
+            return intake_node(state, llm, config)
+        
+        def classification_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
+            return classification_node(state, llm, config)
+        
+        def validation_node_wrapper(state: ClaimsAgentState):
+            return validation_node(state)
+        
+        def research_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
+            return research_node(state, llm, config)
+        
+        def calculator_node_wrapper(state: ClaimsAgentState):
+            return calculator_node(state)
+        
+        def generator_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
+            return generator_node(state, llm, config)
+        
+        def qa_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
+            return qa_node(state, llm, config)
+        
+        def _finalize_node_wrapper(state: ClaimsAgentState):
+            return self._finalize_node(state)
+
         builder = StateGraph(ClaimsAgentState)
 
         # Узлы
-        builder.add_node("intake", intake_node)
-        builder.add_node("classification", classification_node)
-        builder.add_node("validation", validation_node)
-        builder.add_node("research", research_node)
-        builder.add_node("calculator", calculator_node)
-        builder.add_node("generator", generator_node)
-        builder.add_node("qa", qa_node)
-        builder.add_node("finalize", self._finalize_node)
+        builder.add_node("intake", intake_node_wrapper)
+        builder.add_node("classification", classification_node_wrapper)
+        builder.add_node("validation", validation_node_wrapper)
+        builder.add_node("research", research_node_wrapper)
+        builder.add_node("calculator", calculator_node_wrapper)
+        builder.add_node("generator", generator_node_wrapper)
+        builder.add_node("qa", qa_node_wrapper)
+        builder.add_node("finalize", _finalize_node_wrapper)
 
         # Рёбра
         builder.set_entry_point("intake")
@@ -83,8 +117,7 @@ class ClaimsAgent:
 
         builder.add_edge("finalize", END)
 
-        memory = MemorySaver()
-        return builder.compile(checkpointer=memory)
+        return builder.compile(checkpointer=self.memory)
 
     def _route_after_validation(self, state: ClaimsAgentState) -> str:
         """Маршрутизация после валидации."""

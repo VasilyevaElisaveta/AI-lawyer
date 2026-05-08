@@ -15,9 +15,9 @@ from typing import Any, Literal, cast
 from logger import LoggerFactory
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from ...state import ClaimsAgentState
-from ...services.llm_client import invoke_llm
 from ...prompts import (
     CLASSIFICATION_HUMAN,
     CLASSIFICATION_SYSTEM,
@@ -108,7 +108,10 @@ _VALID_PARTY_TYPES: set[PartyType] = {"individual", "legal_entity", "ip", "state
 #  Основная функция узла графа
 # ═══════════════════════════════════════════════════════════════
 
-def classification_node(state: ClaimsAgentState) -> dict[str, Any]:
+def classification_node(
+        state: ClaimsAgentState,
+        llm, 
+        config: RunnableConfig | None = None) -> dict[str, Any]:
     """Узел графа: классификация дела."""
     logger.info("Classification node started")
 
@@ -137,11 +140,14 @@ def classification_node(state: ClaimsAgentState) -> dict[str, Any]:
     prompt = render_template(CLASSIFICATION_HUMAN, prompt_vars)
 
     try:
-        content = invoke_llm([
-            SystemMessage(content=CLASSIFICATION_SYSTEM),
-            HumanMessage(content=prompt),
-        ])
-
+        response = llm.invoke(
+            [
+                SystemMessage(content=CLASSIFICATION_SYSTEM),
+                HumanMessage(content=prompt),
+            ],
+            config=config    
+        )
+        content = response.content
         result = _parse_and_validate_classification(content, state)
 
         logger.info(

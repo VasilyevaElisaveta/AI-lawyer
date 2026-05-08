@@ -7,7 +7,7 @@ from .base import BaseGraphAgent
 
 class ClaimsGraphAgent(BaseGraphAgent):
     def __init__(self, llm):
-        self.agent = ClaimsAgent()
+        self.agent = ClaimsAgent(llm)
 
     async def run(
             self, 
