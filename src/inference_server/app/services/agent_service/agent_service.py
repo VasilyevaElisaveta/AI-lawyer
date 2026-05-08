@@ -190,7 +190,7 @@ class AgentService:
             input_tokens=metadata.get("input_tokens", 0),
             output_tokens=metadata.get("output_tokens", 0),
             total_tokens=metadata.get("total_tokens", 0),
-            run_id=metadata.get("run_id"),
-            trace_id=metadata.get("trace_id"),
+            run_id=str(metadata.get("run_id")),
+            trace_id=str(metadata.get("trace_id")),
             process_name=metadata.get("process_name", "unknown_process")
         )

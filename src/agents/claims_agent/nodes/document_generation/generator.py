@@ -28,15 +28,19 @@ logger = LoggerFactory.get_logger(
 )
 
 
-def generator_node(state: ClaimsAgentState) -> dict[str, Any]:
+def generator_node(
+    state: ClaimsAgentState,
+    llm,
+    config: RunnableConfig
+) -> dict[str, Any]:
     """Узел графа: генерация текста документа (иск или претензия)."""
     document_type = state.get("document_type", "lawsuit")
     logger.info("Generator node started (document_type=%s)", document_type)
 
     if document_type == "complaint":
         pass
-        return _generate_complaint(state)
-    return _generate_lawsuit(state)
+        return _generate_complaint(state, llm, config)
+    return _generate_lawsuit(state, llm, config)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -138,7 +142,7 @@ def _generate_complaint(
 
 def _collect_lawsuit_variables(state: ClaimsAgentState) -> dict[str, Any]:
     """Собирает все переменные для шаблона искового заявления."""
-    from claims_agent.nodes.document_generation.calc import _fmt
+    from .calc import _fmt
 
     def _amount(key: str) -> str:
         val = state.get(key, 0)
@@ -202,7 +206,7 @@ def _collect_lawsuit_variables(state: ClaimsAgentState) -> dict[str, Any]:
 
 def _collect_complaint_variables(state: ClaimsAgentState) -> dict[str, Any]:
     """Собирает все переменные для шаблона претензии."""
-    from claims_agent.nodes.document_generation.calc import _fmt
+    from .calc import _fmt
 
     def _amount(key: str) -> str:
         val = state.get(key, 0)

@@ -176,14 +176,14 @@ class ClaimsAgent:
                     "court": state.get("court_info", ""),
                 },
             )
-            h = hashlib.blake2b(docx_bytes, digest_size=os.getenv("HASH_LENGTH")).hexdigest()
+            h = hashlib.blake2b(docx_bytes, digest_size=int(os.getenv("HASH_LENGTH"))).hexdigest()
 
             logger.info(f"DOCX generated, bytes length: {len(docx_bytes)}, hash: {h}")
 
             docx_directory = (
                 f"{os.getenv('GENERATED_DOCX_PATH')}/"
                 f"{state.get('user_metadata', {}).get('user_id', 'unknown_user')}/"
-                f"{state.get('thread_id', 'unknown_thread')}"
+                f"{state.get('user_metadata', {}).get('thread_id', 'unknown_thread')}"
             )
             os.makedirs(docx_directory, exist_ok=True)
             docx_file = f"{docx_directory}/{h}.docx"
@@ -289,6 +289,7 @@ class ClaimsAgent:
 
         document_path = state.get("document_path", "")
         if document_path:
+            logger.debug(f"Got document path: {document_path}")
             return {
                 "reply": document_path,
                 "handled_by_agent": True,

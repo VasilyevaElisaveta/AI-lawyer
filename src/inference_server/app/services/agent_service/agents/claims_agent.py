@@ -19,5 +19,5 @@ class ClaimsGraphAgent(BaseGraphAgent):
         return {
             "reply": result.get("reply", ""),
             "handled_by_agent": result.get("handled_by_agent", True),
-            "document_created": False,
+            "document_created": result.get("document_created", False),
         }
