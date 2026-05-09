@@ -8,7 +8,7 @@ from langchain_core.tracers.context import collect_runs
 
 from logger import LoggerFactory
 
-from .nodes import classification_node, clear_previous_run_results, clear_before_end
+from .nodes import classification_node, clear_previous_run_results, clear_before_end, interrupt_check_node
 from .state import RouterAgentState
 
 
@@ -23,10 +23,13 @@ def create_graph(llm) -> StateGraph:
     """
     Создаёт граф маршрутизирующего агента.
 
-    Граф состоит из одного узла:
-    1. classification - классификация запроса пользователя в одну из 4 категорий
+    Граф состоит из узлов:
+    1. clear_previous - очистка предыдущих результатов
+    2. interrupt_check - проверка прерывания активной задачи (если есть)
+    3. classification - классификация запроса пользователя в одну из 4 категорий
+    4. clear_before_end - очистка перед завершением
 
-    После классификации граф завершает работу, передавая результат классификации.
+    После классификации граф завершает работу, передавая результат маршрутизации.
     """
 
     async def clear_previous_node_wrapper(
@@ -39,6 +42,12 @@ def create_graph(llm) -> StateGraph:
     ) -> dict[str, Any]:
         return await clear_before_end(state)
 
+    async def interrupt_check_node_wrapper(
+        state: RouterAgentState, 
+        config: RunnableConfig | None = None
+    ) -> dict[str, Any]:
+        return await interrupt_check_node(state, llm, config=config)
+
     async def classification_node_wrapper(
         state: RouterAgentState, 
         config: RunnableConfig | None = None
@@ -48,11 +57,17 @@ def create_graph(llm) -> StateGraph:
     graph = StateGraph(RouterAgentState)
 
     graph.add_node("clear_previous", clear_previous_node_wrapper)
+    graph.add_node("interrupt_check", interrupt_check_node_wrapper)
     graph.add_node("clear_before_end", clear_before_end_wrapper)
     graph.add_node("classification", classification_node_wrapper)
 
+    def route_after_clear(state: RouterAgentState) -> str:
+        """Всегда проверяем прерывание - пусть узел решает нужна ли проверка"""
+        return "interrupt_check"
+
     graph.add_edge(START, "clear_previous")
-    graph.add_edge("clear_previous", "classification")
+    graph.add_edge("clear_previous", "interrupt_check")
+    graph.add_edge("interrupt_check", "classification")
     graph.add_edge("classification", "clear_before_end")
     graph.add_edge("clear_before_end", END)
 

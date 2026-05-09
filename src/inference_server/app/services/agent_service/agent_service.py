@@ -141,7 +141,7 @@ class AgentService:
             if route == "contract_agent":
                 logger.info("Маршрутизация на contract_agent...")
                 result = await self.contract_agent.run(request.raw_input, request.thread_id)
-            if route == "claims_agent":
+            elif route == "claims_agent":
                 logger.info("Маршрутизация на claims_agent...")
                 result = await self.claims_agent.run(
                     request.raw_input,

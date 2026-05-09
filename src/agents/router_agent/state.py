@@ -28,6 +28,14 @@ class RouterAgentState(TypedDict, total=False):
     is_implemented: bool             # реализован ли обработчик для категории
     error: Optional[str]
 
-    routed_to: Optional[str]                   # куда направлен запрос: "contract_agent", "lawsuit_agent", "pretrial_claim_agent", "general_question_agent", None
-    
-    usage_metadata: dict[str, Any]
+    # ── Результат маршрутизации ───────────────────────────
+    routed_to: Optional[str]         # куда направлен запрос: "claims_agent", "contract_agent", "general_questions_agent", None
+
+    # ── Контекст активной задачи ──────────────────────────
+    active_task: Optional[str]       # текущая активная задача ("claims_agent", "contract_agent" и т.д.)
+    previous_active_task: Optional[str]  # предыдущая активная задача (для отката при ошибке)
+    task_context: dict[str, Any]     # дополнительный контекст задачи
+    task_started_at: Optional[str]   # время начала задачи (ISO формат)
+
+    # ── Метаданные использования ───────────────────────────
+    usage_metadata: dict[str, Any]   # метаданные (токены, trace_id и т.д.)
