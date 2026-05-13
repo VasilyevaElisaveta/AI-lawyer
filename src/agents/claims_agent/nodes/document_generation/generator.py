@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from ...state import ClaimsAgentState
+from ...utils import update_tokens_metadata
 from ...prompts import (
     GENERATOR_HUMAN,
     GENERATOR_REWORK_HUMAN,
@@ -83,6 +84,14 @@ def _generate_lawsuit(
             config=config,
         )
         content = response.content
+        usage_metadata = getattr(response, "usage_metadata", None) or {}
+        previous_usage_metadata = state.get("usage_metadata", {}) or {}
+        usage_metadata = update_tokens_metadata(
+            previous_usage_metadata,
+            usage_metadata,
+            ["input_tokens", "output_tokens", "total_tokens"]
+        )
+        return {"generated_document": content, "usage_metadata": usage_metadata}
         logger.info("  Lawsuit generated, length: %d chars", len(content))
         return {"generated_document": content}
     except Exception as e:
@@ -130,6 +139,14 @@ def _generate_complaint(
             config=config,
         )
         content = response.content
+        usage_metadata = getattr(response, "usage_metadata", None) or {}
+        previous_usage_metadata = state.get("usage_metadata", {}) or {}
+        usage_metadata = update_tokens_metadata(
+            previous_usage_metadata,
+            usage_metadata,
+            ["input_tokens", "output_tokens", "total_tokens"]
+        )
+        return {"generated_document": content, "usage_metadata": usage_metadata}
         logger.info("  Complaint generated, length: %d chars", len(content))
         return {"generated_document": content}
     except Exception as e:
