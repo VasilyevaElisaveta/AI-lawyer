@@ -98,3 +98,5 @@ class ClaimsAgentState(TypedDict, total=False):
     document_path: str
     pipeline_status: str            # "in_progress" | "completed" | "completed_with_errors" | "failed"
     error: str                      # Описание ошибки (если есть)
+
+    usage_metadata: dict[str, Any]
