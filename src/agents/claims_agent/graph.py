@@ -8,6 +8,8 @@ import hashlib
 
 from logger import LoggerFactory
 
+from langchain_core.tracers.context import collect_runs
+
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
@@ -268,13 +270,28 @@ class ClaimsAgent:
 
             config = {"configurable": {"thread_id": thread_id}}
 
-            final_state = await asyncio.to_thread(
-                self.graph.invoke,
-                initial_state,
-                config,
-            )
+            with collect_runs() as runs_cb:
+                final_state = await asyncio.to_thread(
+                    self.graph.invoke,
+                    initial_state,
+                    config,
+                )
+            root_run = runs_cb.traced_runs[-1]
 
-            return self._format_response(final_state)
+
+            usage = final_state.get("usage_metadata", {}) or {}
+            metadata = {
+                "run_id": str(root_run.id),
+                "trace_id": str(root_run.trace_id),
+                "latency_ms": int((root_run.end_time - root_run.start_time).total_seconds() * 1000),
+                "input_tokens": int(usage.get("input_tokens", 0) or 0),
+                "output_tokens": int(usage.get("output_tokens", 0) or 0),
+                "total_tokens": int(usage.get("total_tokens", 0) or 0),
+            }
+            
+            response = self._format_response(final_state)
+            response["metadata"] = metadata
+            return response
 
         except Exception as e:
             logger.error("Processing failed: %s", e, exc_info=True)
