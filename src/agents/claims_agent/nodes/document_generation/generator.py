@@ -122,13 +122,14 @@ def _generate_complaint(
         system = COMPLAINT_GENERATOR_SYSTEM
 
     try:
-        content = llm.invoke(
+        response = llm.invoke(
             [
                 SystemMessage(content=system),
                 HumanMessage(content=prompt),
             ],
             config=config,
         )
+        content = response.content
         logger.info("  Complaint generated, length: %d chars", len(content))
         return {"generated_document": content}
     except Exception as e:
