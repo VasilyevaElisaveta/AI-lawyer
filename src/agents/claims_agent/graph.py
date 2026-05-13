@@ -101,7 +101,7 @@ class ClaimsAgent:
         builder.add_conditional_edges(
             "validation",
             self._route_after_validation,
-            {"research": "research", "intake": "intake"},
+            {"research": "research", "intake": "intake", END: END},
         )
 
         builder.add_edge("research", "calculator")
@@ -131,8 +131,12 @@ class ClaimsAgent:
             logger.info("Validation failed, retrying intake (attempt %d)", attempts)
             return "intake"
 
-        logger.warning("Validation failed but proceeding to research")
-        return "research"
+        logger.warning(
+            "Validation failed after %d attempt(s), stopping pipeline. Errors: %s",
+            attempts,
+            state.get("validation_errors", []),
+        )
+        return END
 
     def _route_after_qa(self, state: ClaimsAgentState) -> str:
         """Маршрутизация после QA."""
