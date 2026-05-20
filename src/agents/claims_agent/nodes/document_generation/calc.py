@@ -7,6 +7,8 @@ from typing import Any
 
 from logger import LoggerFactory
 
+from ...services.calculator import calculate_state_duty_from_state
+from ...services.calculator.fee_calculator import DutyResult
 from ...state import ClaimsAgentState
 
 
@@ -36,8 +38,9 @@ def calculator_node(state: ClaimsAgentState) -> dict[str, Any]:
     result = {}
 
     try:
-        # Расчёт госпошлины
-        state_duty = _calculate_state_duty(state)
+        # Расчёт госпошлины (CourtDutyCalculator)
+        duty_result = calculate_state_duty_from_state(state)
+        state_duty = duty_result.amount
 
         # Расчёт неустойки (если есть параметры)
         penalty_calc = _calculate_penalty(state)
@@ -50,7 +53,7 @@ def calculator_node(state: ClaimsAgentState) -> dict[str, Any]:
 
         # Формируем детальный расчёт для документа
         calculation_details = _format_calculation_details(
-            state, state_duty, penalty_calc, interest_calc, total_claim
+            state, duty_result, penalty_calc, interest_calc, total_claim
         )
 
         result = {
@@ -78,79 +81,6 @@ def calculator_node(state: ClaimsAgentState) -> dict[str, Any]:
         }
 
     return result
-
-
-def _calculate_state_duty(state: ClaimsAgentState) -> float:
-    """
-    Расчёт госпошлины на основе параметров из state.
-
-    Returns:
-        размер госпошлины в рублях
-    """
-    case_type = state.get("case_type", "").lower()
-    is_property = state.get("is_property_dispute", False)
-    case_category = state.get("case_category", "").lower()
-
-    # Специальные категории
-    if case_category == "divorce":
-        logger.debug("Госпошлина: расторжение брака")
-        return 5_000.0
-
-    if case_category == "alimony":
-        logger.debug("Госпошлина: взыскание алиментов")
-        return 150.0
-
-    if case_category == "alimony_children_and_plaintiff":
-        logger.debug("Госпошлина: взыскание алиментов на детей и истца")
-        return 300.0
-
-    # Имущественные споры - берём из total_claim
-    if is_property:
-        claim_amount = _to_float(state.get("total_claim", 0))
-
-        # Если total_claim не указан, считаем сумму компонентов
-        if claim_amount == 0:
-            claim_amount = (
-                _to_float(state.get("principal_amount", 0)) +
-                _to_float(state.get("penalty_amount", 0)) +
-                _to_float(state.get("interest_amount", 0)) +
-                _to_float(state.get("moral_damage", 0))
-            )
-
-        if claim_amount <= 0:
-            raise ValueError("Для имущественного спора не указана сумма иска")
-
-        if case_type == "civil":
-            duty = calc_state_duty_civil(claim_amount)
-        elif case_type == "arbitration":
-            duty = calc_state_duty_arbitration(claim_amount)
-        else:
-            raise ValueError(f"Неизвестный тип дела: {case_type}")
-
-        logger.debug(
-            f"Госпошлина (имущественный спор): "
-            f"суд={case_type}, сумма={_fmt(claim_amount)}, пошлина={_fmt(duty)}"
-        )
-        return duty
-
-    # Неимущественные споры
-    else:
-        # Для неимущественных нужно определить тип заявителя
-        # Можно добавить в state или определить по контексту
-        # Пока используем дефолтное значение для физлица
-        applicant_type = "individual"  # можно добавить в AgentState
-
-        duty = calc_state_duty_non_property(
-            court_type=case_type,
-            case_category=case_category,
-            applicant_type=applicant_type
-        )
-
-        logger.debug(
-            f"Госпошлина (неимущественный спор): "
-            f"суд={case_type}, категория={case_category}, пошлина={_fmt(duty)}"
-        )
-        return duty
 
 
 def _calculate_penalty(state: ClaimsAgentState) -> dict[str, Any]:
@@ -272,7 +202,7 @@ def _calculate_total_claim(
 
 def _format_calculation_details(
     state: ClaimsAgentState,
-    state_duty: float,
+    duty_result: DutyResult,
     penalty_calc: dict,
     interest_calc: dict,
     total_claim: float
@@ -325,7 +255,18 @@ def _format_calculation_details(
     lines.append("")
     lines.append(f"ИТОГО цена иска: {_fmt(total_claim)} руб.")
     lines.append("")
-    lines.append(f"Государственная пошлина: {_fmt(state_duty)} руб.")
+    lines.append("Государственная пошлина:")
+    if duty_result.is_exempt:
+        lines.append(f"  Освобождение: {duty_result.exemption_details}")
+        lines.append("  К уплате: 0 руб.")
+    else:
+        if duty_result.exemption_details:
+            lines.append(f"  Льгота: {duty_result.exemption_details}")
+        for detail_line in duty_result.calculation_details.splitlines():
+            lines.append(f"  {detail_line}")
+        lines.append(f"  К уплате: {_fmt(duty_result.amount)} руб.")
+    for warning in duty_result.warnings:
+        lines.append(f"  ⚠ {warning}")
 
     # Судебные расходы (отдельно)
     expenses = _to_float(state.get("court_expenses", 0))
@@ -333,248 +274,6 @@ def _format_calculation_details(
         lines.append(f"Судебные расходы: {_fmt(expenses)} руб.")
 
     return "\n".join(lines)
-
-
-# ═══════════════════════════════════════════════════════════════
-#  Госпошлина — суды общей юрисдикции
-# ═══════════════════════════════════════════════════════════════
-
-
-def calc_state_duty_civil(claim: float) -> float:
-    """
-    Расчёт госпошлины для имущественных исков в судах общей юрисдикции.
-    Статья 333.19 п.1 пп.1 НК РФ.
-
-    Args:
-        claim: сумма иска в рублях
-
-    Returns:
-        размер госпошлины в рублях
-    """
-    claim = _to_float(claim)
-
-    if claim <= 0:
-        raise ValueError(f"Сумма иска должна быть положительной: {claim}")
-
-    if claim <= 100_000:
-        duty = 4_000
-    elif claim <= 300_000:
-        duty = 4_000 + (claim - 100_000) * 0.03
-    elif claim <= 500_000:
-        duty = 10_000 + (claim - 300_000) * 0.025
-    elif claim <= 1_000_000:
-        duty = 15_000 + (claim - 500_000) * 0.02
-    elif claim <= 3_000_000:
-        duty = 25_000 + (claim - 1_000_000) * 0.01
-    elif claim <= 8_000_000:
-        duty = 45_000 + (claim - 3_000_000) * 0.007
-    elif claim <= 24_000_000:
-        duty = 80_000 + (claim - 8_000_000) * 0.0035
-    elif claim <= 50_000_000:
-        duty = 136_000 + (claim - 24_000_000) * 0.003
-    elif claim <= 100_000_000:
-        duty = 214_000 + (claim - 50_000_000) * 0.002
-    else:
-        duty = 314_000 + (claim - 100_000_000) * 0.0015
-        duty = min(duty, 900_000)  # не более 900 000 рублей
-
-    return duty
-
-
-# ═══════════════════════════════════════════════════════════════
-#  Госпошлина — арбитражные суды
-# ═══════════════════════════════════════════════════════════════
-
-def calc_state_duty_arbitration(claim: float) -> float:
-    """
-    Расчёт госпошлины для имущественных исков в арбитражных судах.
-    Статья 333.21 п.1 пп.1 НК РФ.
-
-    Args:
-        claim: сумма иска в рублях
-
-    Returns:
-        размер госпошлины в рублях
-    """
-    claim = _to_float(claim)
-
-    if claim <= 0:
-        raise ValueError(f"Сумма иска должна быть положительной: {claim}")
-
-    if claim <= 100_000:
-        duty = 10_000
-    elif claim <= 1_000_000:
-        duty = 10_000 + (claim - 100_000) * 0.05
-    elif claim <= 10_000_000:
-        duty = 55_000 + (claim - 1_000_000) * 0.03
-    elif claim <= 50_000_000:
-        duty = 325_000 + (claim - 10_000_000) * 0.01
-    else:
-        duty = 725_000 + (claim - 50_000_000) * 0.005
-        duty = min(duty, 10_000_000)  # не более 10 000 000 рублей
-
-    return duty
-
-
-def calc_state_duty_non_property(
-    court_type: str,
-    case_category: str = "",
-    applicant_type: str = "individual"
-) -> float:
-    """
-    Расчёт госпошлины для неимущественных исков и специальных категорий дел.
-
-    Args:
-        court_type: 'civil' или 'arbitration'
-        case_category: категория дела
-        applicant_type: 'individual' или 'organization'
-
-    Returns:
-        размер госпошлины в рублях
-    """
-    court_type = court_type.lower()
-    applicant_type = applicant_type.lower()
-    case_category = case_category.lower()
-
-    # Специальные категории
-    if case_category == "divorce":
-        return 5_000.0
-
-    if case_category == "alimony":
-        return 150.0
-
-    if case_category == "alimony_children_and_plaintiff":
-        return 300.0
-
-    # Апелляция/кассация
-    if case_category.startswith("appeal"):
-        return _get_appeal_duty(court_type, applicant_type, case_category)
-
-    # Административные иски
-    if case_category.startswith("admin"):
-        return _get_admin_duty(court_type, applicant_type, case_category)
-
-    # Банкротство
-    if case_category == "bankruptcy":
-        if applicant_type == "individual":
-            return 10_000.0
-        return 100_000.0
-
-    if case_category == "bankruptcy_debtor":
-        return 0.0
-
-    # Другие специальные заявления
-    special_fees = _get_special_fees(court_type, applicant_type, case_category)
-    if special_fees is not None:
-        return special_fees
-
-    # Обычные неимущественные иски
-    if court_type == "civil":
-        duty = 3_000.0 if applicant_type == "individual" else 20_000.0
-    elif court_type == "arbitration":
-        duty = 15_000.0 if applicant_type == "individual" else 50_000.0
-    else:
-        raise ValueError(f"Неизвестный тип суда: {court_type}")
-
-    return duty
-
-
-def _get_appeal_duty(court_type: str, applicant_type: str, category: str) -> float:
-    """Госпошлина за апелляцию/кассацию."""
-    fees_civil = {
-        "appeal": {"individual": 3_000, "organization": 15_000},
-        "cassation": {"individual": 5_000, "organization": 20_000},
-        "supreme": {"individual": 7_000, "organization": 25_000}
-    }
-
-    fees_arbitration = {
-        "appeal": {"individual": 10_000, "organization": 30_000},
-        "cassation": {"individual": 20_000, "organization": 50_000},
-        "supreme": {"individual": 30_000, "organization": 80_000}
-    }
-
-    fees = fees_civil if court_type == "civil" else fees_arbitration
-    appeal_type = category.replace("appeal_", "") if category.startswith("appeal_") else category
-
-    result = fees.get(appeal_type, {}).get(applicant_type, 0)
-
-    return float(result)
-
-
-def _get_admin_duty(court_type: str, applicant_type: str, category: str) -> float:
-    """Госпошлина по административным искам."""
-    if court_type == "civil":
-        admin_fees = {
-            "admin_normative": {"individual": 4_000, "organization": 20_000},
-            "admin_non_normative": {"individual": 3_000, "organization": 15_000},
-            "admin_compensation": {"individual": 300, "organization": 6_000},
-            "admin_detention": {"individual": 300, "organization": 6_000}
-        }
-    else:  # arbitration
-        admin_fees = {
-            "admin_ip_normative": {"individual": 10_000, "organization": 60_000},
-            "admin_non_normative": {"individual": 10_000, "organization": 50_000},
-            "admin_compensation": {"individual": 300, "organization": 6_000}
-        }
-
-    return float(admin_fees.get(category, {}).get(applicant_type, 0))
-
-
-def _get_special_fees(court_type: str, applicant_type: str, category: str) -> float | None:
-    """Другие специальные заявления."""
-    special_civil = {
-        "special_proceedings": 3_000,
-        "succession": {"individual": 2_000, "organization": 15_000},
-        "duplicate_writ": 1_500,
-        "postponement": 3_000,
-        "review_new": 10_000,
-        "security": 10_000
-    }
-
-    special_arbitration = {
-        "legal_facts": 30_000,
-        "succession": {"individual": 5_000, "organization": 25_000},
-        "duplicate_writ": 10_000,
-        "review_new": 30_000,
-        "security": 30_000
-    }
-
-    fees = special_civil if court_type == "civil" else special_arbitration
-    fee = fees.get(category)
-
-    if fee is None:
-        return None
-
-    if isinstance(fee, dict):
-        return float(fee.get(applicant_type, 0))
-
-    return float(fee)
-
-
-def calc_court_order_duty(claim_amount: float, court_type: str = "civil") -> float:
-    """
-    Расчёт госпошлины за судебный приказ.
-    50% от пошлины по имущественному иску, но не менее 8000 руб. для арбитража.
-    """
-    if court_type == "civil":
-        base_duty = calc_state_duty_civil(claim_amount)
-        return base_duty * 0.5
-    else:
-        base_duty = calc_state_duty_arbitration(claim_amount)
-        return max(base_duty * 0.5, 8_000.0)
-
-
-def calc_enforcement_duty(decision_amount: float, court_type: str = "civil") -> float:
-    """
-    Госпошлина за выдачу исполнительных листов.
-    30% от госпошлины по имущественному иску.
-    """
-    if court_type == "civil":
-        base_duty = calc_state_duty_civil(decision_amount)
-    else:
-        base_duty = calc_state_duty_arbitration(decision_amount)
-
-    return base_duty * 0.3
 
 
 # ═══════════════════════════════════════════════════════════════
