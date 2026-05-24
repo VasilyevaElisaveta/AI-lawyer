@@ -130,32 +130,65 @@ class AgentService:
                 return self._to_response(result)
 
             logger.info("Использование router agent для классификации...")
-            route_result = await self.router_agent.run(request.raw_input, request.thread_id)
-
-            route = route_result.get("routed_to", "general_questions_agent")
+            route_result = await self.router_agent.run(
+                request.raw_input,
+                request.thread_id,
+            )
 
             check_error(route_result)
-            
+
+            if not route_result.get("fields_ready", False):
+                reply = route_result.get("reply") or (
+                    "Для продолжения укажите недостающие данные."
+                )
+                logger.info("Router: ожидание дополнения полей пользователем")
+                return self._to_response({
+                    "reply": reply,
+                    "handled_by_agent": True,
+                    "document_created": False,
+                    "metadata": route_result.get("metadata", {}),
+                })
+
+            route = route_result.get("routed_to")
+            if not route:
+                return ChatResponse(
+                    reply=route_result.get("error") or "Не удалось определить агента.",
+                    handled_by_agent=False,
+                    document_created=False,
+                    is_error=True,
+                )
+
             logger.info(f"Запрос классифицирован как: {route}")
+            input_data = route_result.get("input_data")
+            document_type = route_result.get("document_type")
 
             if route == "contract_agent":
                 logger.info("Маршрутизация на contract_agent...")
                 result = await self.contract_agent.run(request.raw_input, request.thread_id)
-            if route == "claims_agent":
+            elif route == "claims_agent":
                 logger.info("Маршрутизация на claims_agent...")
                 result = await self.claims_agent.run(
                     request.raw_input,
-                    request.thread_id, 
-                    user_metadata=request.user_metadata
+                    request.thread_id,
+                    user_metadata=request.user_metadata,
+                    input_data=input_data,
+                    document_type=document_type,
                 )
             elif route == "general_questions_agent":
                 logger.info("Маршрутизация на general_agent...")
-                result = await self.general_questions_agent.run(request.raw_input, request.thread_id)
+                message = request.raw_input
+                if input_data and input_data.get("question"):
+                    message = input_data["question"]
+                result = await self.general_questions_agent.run(message, request.thread_id)
             else:
                 logger.warning(f"Неизвестный маршрут: {route}, используем general_questions_agent")
                 result = await self.general_questions_agent.run(request.raw_input, request.thread_id)
-            
+
             check_error(result)
+
+            if result.get("task_completed"):
+                logger.info("Задача завершена — сброс current_agent в router")
+                await self.router_agent.clear_current_agent(request.thread_id)
 
             response = self._to_response(result)
             logger.info(f"Ответ готов: {len(response.reply)} символов")
