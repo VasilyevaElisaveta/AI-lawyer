@@ -4,8 +4,6 @@
 import os
 import asyncio
 from typing import Any
-import hashlib
-
 from logger import LoggerFactory
 
 from langchain_core.tracers.context import collect_runs
@@ -15,6 +13,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
 
 from .state import ClaimsAgentState
+from .session import session_reset_values
 from .nodes import (
     intake_node,
     classification_node,
@@ -23,8 +22,16 @@ from .nodes import (
     calculator_node,
     generator_node,
     qa_node,
+    evaluate_continue_task
 )
-from .utils.docx_generator import generate_docx_bytes, save_docx_file
+from .utils.docx_generator import (
+    build_docx_filename,
+    generate_docx_bytes,
+    resolve_unique_docx_path,
+    save_docx_file,
+)
+
+from ..utils import resolve_run_usage, state_int
 
 
 logger = LoggerFactory.get_logger(
@@ -55,13 +62,52 @@ class ClaimsAgent:
         self.graph = self._build_graph(llm)
         logger.info("ClaimsAgent initialized")
 
+    async def get_current_agent(self, thread_id: str) -> str | None:
+        config = {"configurable": {"thread_id": thread_id}}
+        snapshot = await self.graph.aget_state(config)
+        if not snapshot or not snapshot.values:
+            return None
+        return snapshot.values.get("current_agent")
+
+    async def check_continue_task(self, raw_input: str, thread_id: str) -> bool:
+        config = {"configurable": {"thread_id": thread_id}}
+        snapshot = await self.graph.aget_state(config)
+        session_state = snapshot.values if snapshot else {}
+        result = await evaluate_continue_task(
+            raw_input,
+            session_state,
+            self.llm,
+            config=config,
+        )
+        return bool(result.get("continue_current_task", False))
+
+    async def _reset_usage_counters(self, config: dict) -> None:
+        snapshot = await self.graph.aget_state(config)
+        if snapshot and snapshot.values:
+            await self.graph.aupdate_state(
+                config=config,
+                values={"usage_metadata": {}},
+                as_node="intake",
+            )
+
+    async def clear_session(self, thread_id: str) -> None:
+        config = {"configurable": {"thread_id": thread_id}}
+        snapshot = await self.graph.aget_state(config)
+        if snapshot and snapshot.values:
+            await self.graph.aupdate_state(
+                config=config,
+                values=session_reset_values(),
+                as_node="intake",
+            )
+        logger.info("Claims session cleared for thread %s", thread_id)
+
     def _build_graph(self, llm) -> Any:
         """Строит граф обработки."""
 
         def intake_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
             return intake_node(state, llm, config)
         
-        def classification_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
+        def case_analysis_node_wrapper(state: ClaimsAgentState, config: RunnableConfig):
             return classification_node(state, llm, config)
         
         def validation_node_wrapper(state: ClaimsAgentState):
@@ -86,7 +132,7 @@ class ClaimsAgent:
 
         # Узлы
         builder.add_node("intake", intake_node_wrapper)
-        builder.add_node("classification", classification_node_wrapper)
+        builder.add_node("case_analysis", case_analysis_node_wrapper)
         builder.add_node("validation", validation_node_wrapper)
         builder.add_node("research", research_node_wrapper)
         builder.add_node("calculator", calculator_node_wrapper)
@@ -96,15 +142,13 @@ class ClaimsAgent:
 
         # Рёбра
         builder.set_entry_point("intake")
-        builder.add_edge("intake", "classification")
-        builder.add_edge("classification", "validation")
-
-        # Условная маршрутизация после валидации
+        builder.add_edge("intake", "validation")
         builder.add_conditional_edges(
             "validation",
             self._route_after_validation,
-            {"research": "research", "intake": "intake", END: END},
+            {"case_analysis": "case_analysis", "intake": "intake", END: END},
         )
+        builder.add_edge("case_analysis", "research")
 
         builder.add_edge("research", "calculator")
         builder.add_edge("calculator", "generator")
@@ -122,20 +166,16 @@ class ClaimsAgent:
         return builder.compile(checkpointer=self.memory)
 
     def _route_after_validation(self, state: ClaimsAgentState) -> str:
-        """Маршрутизация после валидации."""
         if state.get("is_valid", False):
-            return "research"
-
-        attempts = state.get("validation_attempts", 0)
+            logger.info("[claims] обязательные поля заполнены — анализ дела и генерация")
+            return "case_analysis"
+        attempts = state_int(state, "validation_attempts", 0)
         has_raw = bool(state.get("raw_input"))
-
         if has_raw and attempts < 2:
-            logger.info("Validation failed, retrying intake (attempt %d)", attempts)
+            logger.info("[claims] повтор intake (попытка %d)", attempts)
             return "intake"
-
-        logger.warning(
-            "Validation failed after %d attempt(s), stopping pipeline. Errors: %s",
-            attempts,
+        logger.info(
+            "[claims] остановка: ждём данные от пользователя — %s",
             state.get("validation_errors", []),
         )
         return END
@@ -145,17 +185,17 @@ class ClaimsAgent:
         if state.get("qa_passed", False):
             return "finalize"
 
-        attempts = state.get("qa_attempts", 0)
+        attempts = state_int(state, "qa_attempts", 0)
         if attempts < 2:
-            logger.info("QA failed, regenerating (attempt %d)", attempts)
+            logger.info("[claims][qa] повтор генерации (попытка %d)", attempts)
             return "generator"
 
-        logger.warning("QA retries exhausted, finalizing")
+        logger.info("[claims][qa] лимит попыток — финализация с текущим текстом")
         return "finalize"
 
     def _finalize_node(self, state: ClaimsAgentState) -> dict[str, Any]:
         """Финализация: генерация DOCX в base64."""
-        logger.info("Finalize node started")
+        logger.info("[claims][финал] сохранение DOCX")
 
         document_text = state.get("generated_document", "")
         document_type = state.get("document_type", _DEFAULT_DOCUMENT_TYPE)
@@ -182,28 +222,30 @@ class ClaimsAgent:
                     "court": state.get("court_info", ""),
                 },
             )
-            h = hashlib.blake2b(docx_bytes, digest_size=int(os.getenv("HASH_LENGTH"))).hexdigest()
-
-            logger.info(f"DOCX generated, bytes length: {len(docx_bytes)}, hash: {h}")
-
             docx_directory = (
                 f"{os.getenv('GENERATED_DOCX_PATH')}/"
                 f"{state.get('user_metadata', {}).get('user_id', 'unknown_user')}/"
                 f"{state.get('user_metadata', {}).get('thread_id', 'unknown_thread')}"
             )
             os.makedirs(docx_directory, exist_ok=True)
-            docx_file = f"{docx_directory}/{h}.docx"
-            i = 1
-            while os.path.exists(docx_file):
-                docx_file = f"{docx_directory}/{h} ({i}).docx"
-                i += 1
-            with open(docx_file, "wb") as f:
-                f.write(docx_bytes)
+            filename = build_docx_filename(
+                document_type,
+                state.get("plaintiff_info"),
+                state.get("defendant_info"),
+            )
+            docx_file = resolve_unique_docx_path(docx_directory, filename)
+            save_docx_file(docx_bytes, docx_file)
+            logger.info(
+                "DOCX saved: %s (%d bytes)",
+                os.path.basename(docx_file),
+                len(docx_bytes),
+            )
 
             return {
                 "final_document": document_text,
                 "document_path": docx_file,
                 "pipeline_status": "completed",
+                "current_agent": None,
             }
 
         except Exception as e:
@@ -238,14 +280,11 @@ class ClaimsAgent:
                 "document_created": bool
             }
         """
-        logger.info(
-            "Processing message for thread %s (document_type=%s)",
-            thread_id,
-            document_type,
-        )
+        logger.info("[claims] сообщение thread=%s", thread_id)
 
         try:
             import json as _json
+            user_metadata = {**(user_metadata or {}), "thread_id": thread_id}
             try:
                 input_data = _json.loads(user_message)
                 # Тип документа может быть задан внутри JSON-тела
@@ -255,7 +294,22 @@ class ClaimsAgent:
             except _json.JSONDecodeError:
                 initial_state = {"raw_input": user_message}
 
-            # Нормализация и проверка типа документа
+            initial_state["validation_attempts"] = 0
+            initial_state["validation_errors"] = []
+            initial_state["qa_attempts"] = 0
+            config = {"configurable": {"thread_id": thread_id}}
+            await self._reset_usage_counters(config)
+            snapshot = await self.graph.aget_state(config)
+            prev = snapshot.values if snapshot else {}
+
+            if prev.get("current_agent") == "claims_agent":
+                if prev.get("document_type"):
+                    document_type = prev["document_type"]
+            else:
+                if prev:
+                    await self.clear_session(thread_id)
+                prev = {}
+
             if document_type not in _DOCUMENT_TYPES:
                 logger.warning(
                     "Unknown document_type '%s', falling back to '%s'",
@@ -265,10 +319,9 @@ class ClaimsAgent:
                 document_type = _DEFAULT_DOCUMENT_TYPE
 
             initial_state["document_type"] = document_type
+            initial_state["document_type_locked"] = True
             initial_state["request_id"] = thread_id
             initial_state["user_metadata"] = user_metadata
-
-            config = {"configurable": {"thread_id": thread_id}}
 
             with collect_runs() as runs_cb:
                 final_state = await asyncio.to_thread(
@@ -279,14 +332,17 @@ class ClaimsAgent:
             root_run = runs_cb.traced_runs[-1]
 
 
-            usage = final_state.get("usage_metadata", {}) or {}
+            usage = resolve_run_usage(
+                final_state.get("usage_metadata"),
+                runs_cb.traced_runs,
+            )
             metadata = {
                 "run_id": str(root_run.id),
                 "trace_id": str(root_run.trace_id),
                 "latency_ms": int((root_run.end_time - root_run.start_time).total_seconds() * 1000),
-                "input_tokens": int(usage.get("input_tokens", 0) or 0),
-                "output_tokens": int(usage.get("output_tokens", 0) or 0),
-                "total_tokens": int(usage.get("total_tokens", 0) or 0),
+                "input_tokens": usage["input_tokens"],
+                "output_tokens": usage["output_tokens"],
+                "total_tokens": usage["total_tokens"],
             }
             
             response = self._format_response(final_state)
@@ -308,7 +364,7 @@ class ClaimsAgent:
         error = state.get("error", "")
         document_type = state.get("document_type", _DEFAULT_DOCUMENT_TYPE)
 
-        document_path = state.get("document_path", "")
+        document_path = state.get("document_path") or ""
         if document_path:
             logger.debug(f"Got document path: {document_path}")
             return {
@@ -317,17 +373,18 @@ class ClaimsAgent:
                 "document_created": True,
                 "document_type": document_type,
                 "status": pipeline_status,
+                "task_completed": pipeline_status == "completed",
                 "metadata": {
-                    "plaintiff": state.get("plaintiff_info", "")[:100],
-                    "defendant": state.get("defendant_info", "")[:100],
-                    "total_claim": state.get("total_claim", 0),
-                    "state_duty": state.get("state_duty", 0),
+                    "plaintiff": (state.get("plaintiff_info") or "")[:100],
+                    "defendant": (state.get("defendant_info") or "")[:100],
+                    "total_claim": state.get("total_claim") or 0,
+                    "state_duty": state.get("state_duty") or 0,
                 },
             }
 
         if error:
             reply = f"Не удалось создать документ:\n{error}"
-        elif not state.get("is_valid", True):
+        elif state.get("is_valid") is False:
             errors = state.get("validation_errors", [])
             doc_label = "претензии" if document_type == "complaint" else "искового заявления"
             reply = (
@@ -338,10 +395,14 @@ class ClaimsAgent:
         else:
             reply = "Обработка завершена, но документ не был сгенерирован."
 
+        awaiting_input = state.get("current_agent") == "claims_agent"
+
         return {
             "reply": reply,
             "handled_by_agent": True,
             "document_created": False,
             "document_type": document_type,
             "status": pipeline_status,
+            "awaiting_input": awaiting_input,
+            "current_agent": state.get("current_agent"),
         }

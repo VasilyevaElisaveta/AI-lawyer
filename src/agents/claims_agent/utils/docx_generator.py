@@ -2,9 +2,11 @@
 Генерация DOCX-документа из текста искового заявления.
 """
 import os
+import re
 import base64
 import io
 import unicodedata
+from datetime import datetime
 from typing import Any
 
 from logger import LoggerFactory
@@ -168,6 +170,60 @@ def _add_formatted_content(doc: Document, text: str) -> None:
         p.paragraph_format.first_line_indent = Inches(0.5)  # Абзацный отступ
 
 
-def save_docx_file(bytes: bytes, path: str) -> None:
+def save_docx_file(docx_bytes: bytes, path: str) -> None:
     with open(path, "wb") as f:
-        f.write(bytes)
+        f.write(docx_bytes)
+
+
+def _party_slug(party_info: str | None, fallback: str) -> str:
+    if not party_info or not str(party_info).strip():
+        return fallback
+    text = str(party_info).strip().split("\n")[0].split(",")[0].strip()
+    text = re.sub(r"\s+", "_", text)
+    text = unicodedata.normalize("NFKC", text)
+    text = re.sub(r'[<>:"/\\|?*]', "", text)
+    text = text.strip("._ ")
+    if len(text) > 48:
+        text = text[:48].rstrip("._ ")
+    return text or fallback
+
+
+def _sanitize_filename_stem(stem: str, max_len: int = 180) -> str:
+    stem = unicodedata.normalize("NFKC", stem)
+    stem = re.sub(r'[<>:"/\\|?*]', "", stem)
+    stem = re.sub(r"_+", "_", stem).strip("._ ")
+    if not stem:
+        return "document"
+    if len(stem) > max_len:
+        stem = stem[:max_len].rstrip("._ ")
+    return stem
+
+
+def build_docx_filename(
+    document_type: str,
+    plaintiff_info: str | None = None,
+    defendant_info: str | None = None,
+    generated_at: datetime | None = None,
+) -> str:
+    """
+    Имя файла: {иск|претензия}_{истец}_{ответчик}_{YYYY-MM-DD_HH-MM-SS}.docx
+    """
+    kind = "претензия" if document_type == "complaint" else "иск"
+    plaintiff = _party_slug(plaintiff_info, "истец")
+    defendant = _party_slug(defendant_info, "ответчик")
+    ts = (generated_at or datetime.now()).strftime("%Y-%m-%d_%H-%M-%S")
+    stem = _sanitize_filename_stem(f"{kind}_{plaintiff}_{defendant}_{ts}")
+    return f"{stem}.docx"
+
+
+def resolve_unique_docx_path(directory: str, filename: str) -> str:
+    path = os.path.join(directory, filename)
+    if not os.path.exists(path):
+        return path
+    stem, ext = os.path.splitext(filename)
+    n = 2
+    while True:
+        candidate = os.path.join(directory, f"{stem}_{n}{ext}")
+        if not os.path.exists(candidate):
+            return candidate
+        n += 1

@@ -3,11 +3,16 @@
 Поддерживает два режима: исковое заявление (lawsuit) и претензия (complaint).
 """
 import os
+import re
 from typing import Any
 
 from logger import LoggerFactory
 
+from ..document_generation.calc import parse_date
+
 from ...state import ClaimsAgentState
+
+from ....utils import state_float, state_int
 
 
 logger = LoggerFactory.get_logger(
@@ -30,13 +35,22 @@ _REQUIRED_PROPERTY: list[tuple[str, str]] = [
 ]
 
 
+def _is_property_dispute(state: ClaimsAgentState) -> bool:
+    if state.get("is_property_dispute"):
+        return True
+    amount = state_float(state, "principal_amount", 0)
+    if amount > 0:
+        return True
+    text = f"{state.get('claims', '')} {state.get('facts', '')}"
+    return bool(re.search(r"\d+.*руб|сумм[аы]\s+\d", text, re.I))
+
+
 def validation_node(state: ClaimsAgentState) -> dict[str, Any]:
     """Узел графа: проверка полноты данных."""
-    logger.info("Validation node started")
-
-    document_type = state.get("document_type", "lawsuit")
+    doc_type = state.get("document_type", "lawsuit")
+    logger.info("[claims][validation] проверка обязательных полей (документ=%s)", doc_type)
     errors: list[str] = []
-    attempts: int = state.get("validation_attempts", 0) + 1
+    attempts: int = state_int(state, "validation_attempts", 0) + 1
 
     # ── Обязательные поля ─────────────────────────────────────
     for field, msg in _REQUIRED_ALWAYS:
@@ -44,8 +58,7 @@ def validation_node(state: ClaimsAgentState) -> dict[str, Any]:
         if not value or (isinstance(value, str) and not value.strip()):
             errors.append(msg)
 
-    # ── Имущественный спор ────────────────────────────────────
-    is_property = state.get("is_property_dispute", False)
+    is_property = _is_property_dispute(state)
     if is_property:
         for field, msg in _REQUIRED_PROPERTY:
             value = state.get(field)
@@ -79,25 +92,32 @@ def validation_node(state: ClaimsAgentState) -> dict[str, Any]:
     )
 
     # ── Специфичная валидация для претензии ───────────────────
-    if document_type == "complaint":
+    if doc_type == "complaint":
         _validate_complaint_fields(state, errors)
 
     is_valid = len(errors) == 0
-    logger.info(
-        "  Validation attempt %d: %s  (errors: %d)",
-        attempts,
-        "PASSED" if is_valid else "FAILED",
-        len(errors),
-    )
-    if errors:
-        for e in errors:
-            logger.info("    • %s", e)
+    if is_valid:
+        logger.info("[claims][validation] успех (попытка %d)", attempts)
+    else:
+        logger.info(
+            "[claims][validation] не хватает данных (попытка %d): %s",
+            attempts,
+            "; ".join(errors),
+        )
 
-    return {
+    result: dict[str, Any] = {
         "validation_errors": errors,
         "is_valid": is_valid,
         "validation_attempts": attempts,
     }
+
+    # Ожидание ввода пользователя: после исчерпания внутренних повторов intake
+    if not is_valid:
+        has_raw = bool(state.get("raw_input"))
+        if not (has_raw and attempts < 2):
+            result["current_agent"] = "claims_agent"
+
+    return result
 
 
 # ── Вспомогательные ───────────────────────────────────────────
@@ -137,7 +157,6 @@ def _validate_date_pair(
     elif end and not start:
         errors.append(f"Указана дата окончания {label}, но не указана дата начала")
     if start and end:
-        from claims_agent.nodes.document_generation.calc import parse_date
         try:
             d_start = parse_date(start)
             d_end = parse_date(end)

@@ -23,6 +23,9 @@ from ...prompts import (
     render_template,
 )
 
+from ....utils import state_int
+
+
 
 logger = LoggerFactory.get_logger(
     name=__name__,
@@ -42,7 +45,7 @@ def qa_node(
     document_type = state.get("document_type", "lawsuit")
     logger.info("QA node started (document_type=%s)", document_type)
 
-    qa_attempts = state.get("qa_attempts", 0) + 1
+    qa_attempts = state_int(state, "qa_attempts", 0) + 1
     document = state.get("generated_document", "")
 
     if not document:

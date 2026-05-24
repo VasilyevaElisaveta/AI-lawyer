@@ -9,8 +9,9 @@ from logger import LoggerFactory
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
+from .calc import _fmt
+
 from ...state import ClaimsAgentState
-from ...utils import update_tokens_metadata
 from ...prompts import (
     GENERATOR_HUMAN,
     GENERATOR_REWORK_HUMAN,
@@ -20,6 +21,8 @@ from ...prompts import (
     COMPLAINT_GENERATOR_REWORK_HUMAN,
     render_template,
 )
+
+from ....utils import update_tokens_metadata, state_int
 
 
 logger = LoggerFactory.get_logger(
@@ -36,7 +39,7 @@ def generator_node(
 ) -> dict[str, Any]:
     """Узел графа: генерация текста документа (иск или претензия)."""
     document_type = state.get("document_type", "lawsuit")
-    logger.info("Generator node started (document_type=%s)", document_type)
+    logger.info(f"Generator node started (document_type={document_type})")
 
     if document_type == "complaint":
         pass
@@ -55,7 +58,7 @@ def _generate_lawsuit(
     ) -> dict[str, Any]:
     """Генерация искового заявления."""
     qa_feedback = state.get("qa_feedback", "")
-    qa_attempts = state.get("qa_attempts", 0)
+    qa_attempts = state_int(state, "qa_attempts", 0)
 
     variables = _collect_lawsuit_variables(state)
 
@@ -92,10 +95,8 @@ def _generate_lawsuit(
             ["input_tokens", "output_tokens", "total_tokens"]
         )
         return {"generated_document": content, "usage_metadata": usage_metadata}
-        logger.info("  Lawsuit generated, length: %d chars", len(content))
-        return {"generated_document": content}
     except Exception as e:
-        logger.error("Lawsuit generator failed: %s", e)
+        logger.error(f"Lawsuit generator failed: {e}")
         return {"error": f"Ошибка генерации искового заявления: {e}"}
 
 
@@ -110,7 +111,7 @@ def _generate_complaint(
     ) -> dict[str, Any]:
     """Генерация досудебной претензии."""
     qa_feedback = state.get("qa_feedback", "")
-    qa_attempts = state.get("qa_attempts", 0)
+    qa_attempts = state_int(state, "qa_attempts", 0)
 
     variables = _collect_complaint_variables(state)
 
@@ -147,10 +148,8 @@ def _generate_complaint(
             ["input_tokens", "output_tokens", "total_tokens"]
         )
         return {"generated_document": content, "usage_metadata": usage_metadata}
-        logger.info("  Complaint generated, length: %d chars", len(content))
-        return {"generated_document": content}
     except Exception as e:
-        logger.error("Complaint generator failed: %s", e)
+        logger.error(f"Complaint generator failed: {e}")
         return {"error": f"Ошибка генерации претензии: {e}"}
 
 
@@ -475,7 +474,6 @@ def _generate_attachments_list(state: ClaimsAgentState) -> str:
 
     state_duty = state.get("state_duty", 0.0)
     if state_duty > 0:
-        from claims_agent.nodes.document_generation.calc import _fmt
         attachments.append(
             f"{counter}. Платёжное поручение (квитанция) об уплате государственной пошлины "
             f"на сумму {_fmt(state_duty)} руб. — 1 экз."

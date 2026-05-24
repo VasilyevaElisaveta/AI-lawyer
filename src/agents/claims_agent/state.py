@@ -19,6 +19,10 @@ class ClaimsAgentState(TypedDict, total=False):
 
     user_metadata: dict[str, Any]
 
+    # ── Сессия (ожидание дополнения данных пользователем) ────
+    current_agent: str              # "claims_agent" пока задача не завершена
+    continue_current_task: bool     # результат узла проверки продолжения
+
     # ── Входные данные ────────────────────────────────────────
     raw_input: str                  # свободный текст от пользователя
     input_data: dict[str, Any]      # структурированный ввод (от маршрутизатора)
@@ -28,10 +32,11 @@ class ClaimsAgentState(TypedDict, total=False):
     user_id: str                    # ID пользователя
     x_headers: dict[str, str]       # заголовки запроса
 
-    # ── Тип генерируемого документа ───────────────────────────
-    # "lawsuit"   — исковое заявление (по умолчанию)
+    # ── Тип генерируемого документа (от router) ─────────────
+    # "lawsuit"   — исковое заявление
     # "complaint" — досудебная претензия
     document_type: str
+    document_type_locked: bool
 
     # ── Извлечённые данные дела ────────────────────────────────
     plaintiff_info: str

@@ -24,12 +24,14 @@ from ...prompts import (
     render_template,
 )
 
+from ....utils import extract_llm_json, state_float
+
+
 logger = LoggerFactory.get_logger(
     name=__name__,
     logs_path=os.getenv("LOGS_DIR"),
     log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,
 )
-
 
 # ═══════════════════════════════════════════════════════════════
 #  Типы и константы
@@ -113,14 +115,17 @@ def classification_node(
         llm, 
         config: RunnableConfig | None = None) -> dict[str, Any]:
     """Узел графа: классификация дела."""
-    logger.info("Classification node started")
-
-    # Идемпотентность: если уже классифицировано — пропускаем
-    # Проверяем наличие новых полей классификации
-    if (state.get("case_type") and
-        state.get("case_category") and
-        state.get("classification_data")):
-        logger.info("  Already classified — skipping")
+    doc_type = state.get("document_type", "lawsuit")
+    logger.info(
+        "[claims][case analysis] юридическая классификация спора (документ=%s)",
+        doc_type,
+    )
+    if (
+        state.get("case_type")
+        and state.get("case_category")
+        and state.get("classification_data")
+    ):
+        logger.info("[claims][case analysis] уже выполнен ранее — пропуск")
         return {}
 
     # Подготовка данных для промпта
@@ -151,17 +156,14 @@ def classification_node(
         result = _parse_and_validate_classification(content, state)
 
         logger.info(
-            "  Classified: type=%s category=%s/%s jurisdiction=%s pretrial_req=%s confidence=%.2f",
+            "[claims][case analysis] результат: тип=%s категория=%s подсудность=%s имущественный=%s",
             result.case_type,
             result.case_category,
-            result.case_subcategory or "-",
             result.court_jurisdiction,
-            result.pretrial_required,
-            result.confidence,
+            result.claim_nature in ("property", "mixed"),
         )
-
         if result.warnings:
-            logger.warning("  Warnings: %s", "; ".join(result.warnings))
+            logger.warning(f"[claims][case analysis] предупреждения: {'; '.join(result.warnings)}")
 
         # Преобразуем dataclass в dict и возвращаем обновления state
         classification_dict = asdict(result)
@@ -177,7 +179,9 @@ def classification_node(
         }
 
     except Exception as e:
-        logger.error("Classification failed: %s — using safe defaults", e, exc_info=True)
+        logger.warning(
+            f"[claims][case analysis] ответ LLM не разобран ({e}), значения по умолчанию",
+        )
         return _create_fallback_classification()
 
 
@@ -202,8 +206,9 @@ def _parse_and_validate_classification(
     Raises:
         ValueError: Если JSON невалиден или отсутствуют обязательные поля
     """
-    # Извлечение JSON из markdown-блока или чистого текста
-    data = _extract_json(text)
+    data = extract_llm_json(text)
+    if not data:
+        raise ValueError("No JSON found in LLM response")
 
     # Валидация обязательных полей
     required_fields = [
@@ -266,29 +271,6 @@ def _parse_and_validate_classification(
     result = _validate_logical_consistency(result, state)
 
     return result
-
-
-def _extract_json(text: str) -> dict[str, Any]:
-    """Извлекает JSON из markdown-блока или plain text."""
-    import re
-
-    # Попытка 1: Markdown code block
-    match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
-    if match:
-        raw = match.group(1)
-    else:
-        # Попытка 2: Первая пара фигурных скобок
-        start = text.find("{")
-        end = text.rfind("}") + 1
-        if start == -1 or end == 0:
-            raise ValueError("No JSON found in LLM response")
-        raw = text[start:end]
-
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError as e:
-        logger.error("Invalid JSON from LLM: %s\nRaw text: %s", e, raw[:500])
-        raise ValueError(f"Invalid JSON from LLM: {e}") from e
 
 
 def _validate_enum(
@@ -368,7 +350,7 @@ def _validate_logical_consistency(
         result.confidence *= 0.7
 
     # Проверка подсудности мирового судьи по цене иска
-    total_claim = state.get("total_claim", 0.0)
+    total_claim = state_float(state, "total_claim", 0.0)
     if result.court_jurisdiction == "magistrate" and total_claim >= 100_000:
         result.warnings.append(
             f"ОШИБКА: Цена иска {total_claim:,.2f} руб. превышает 100 000 руб. — "
@@ -476,7 +458,7 @@ def _check_writ_eligibility(
     ГПК РФ ст. 121-122.1: до 500 000 руб., бесспорные требования
     АПК РФ гл. 29.1: до 400 000 руб. (для ИП) / нет лимита (для ЮЛ по некоторым категориям)
     """
-    total_claim = state.get("total_claim", 0.0)
+    total_claim = state_float(state, "total_claim", 0.0)
 
     # ГПК: лимит 500к, только определённые категории
     if result.case_type == "civil":
@@ -517,7 +499,7 @@ def _check_simplified_eligibility(
     АПК РФ гл. 29: до 400 000 руб. (ИП) / 2 000 000 руб. (ЮЛ)
     ГПК РФ ст. 232.2: определённые категории дел
     """
-    total_claim = state.get("total_claim", 0.0)
+    total_claim = state_float(state, "total_claim", 0.0)
 
     # АПК: упрощённое производство
     if result.case_type == "arbitration":

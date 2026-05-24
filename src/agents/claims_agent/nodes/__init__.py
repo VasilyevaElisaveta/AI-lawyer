@@ -15,6 +15,7 @@ from .document_generation.research import research_node
 from .document_generation.calc import calculator_node
 from .document_generation.generator import generator_node
 from .document_generation.qa import qa_node
+from .continue_task import evaluate_continue_task
 
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "calculator_node",
     "generator_node",
     "qa_node",
+    "evaluate_continue_task"
 ]
