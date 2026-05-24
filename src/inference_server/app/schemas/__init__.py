@@ -1,6 +1,15 @@
-from .chat import ChatRequest, ChatResponse, ChatNameRequest, ChatNameResponse
+from .chat import (
+    ChatAgentRequest,
+    ChatRequest,
+    ChatResponse,
+    ChatNameRequest,
+    ChatNameResponse,
+)
 
 __all__ = [
-    "ChatRequest", "ChatResponse",
-    "ChatNameRequest", "ChatNameResponse"
+    "ChatAgentRequest",
+    "ChatRequest",
+    "ChatResponse",
+    "ChatNameRequest",
+    "ChatNameResponse",
 ]

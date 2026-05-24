@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional, Any
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
 
 
 class ChatNameRequest(BaseModel):
@@ -20,10 +20,20 @@ class ChatNameResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     raw_input: str
     thread_id: str
-    user_metadata: Optional[dict[str, Any]] = {}
-    agent_type: Optional[str] = None  # router_agent / contract_agent / claims_agent / general_questions_agent
+    user_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatAgentRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    raw_input: str
+    thread_id: str
+    user_metadata: dict[str, Any] = Field(default_factory=dict)
+    request_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ChatResponse(BaseModel):

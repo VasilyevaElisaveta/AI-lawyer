@@ -9,7 +9,7 @@ from .agents.claims_agent import ClaimsGraphAgent
 from .agents.general_questions_agent import GeneralQuestionsGraphAgent
 from .agents.router_agent import RouterGraphAgent
 
-from ...schemas.chat import ChatRequest, ChatResponse
+from ...schemas.chat import ChatAgentRequest, ChatRequest, ChatResponse
 
 
 logger = LoggerFactory.get_logger(
@@ -129,21 +129,25 @@ class AgentService:
         self.general_questions_agent = GeneralQuestionsGraphAgent(general_questions_llm)
         logger.info("AgentService инициализирован успешно")
 
-    async def process(self, request: ChatRequest) -> ChatResponse:
-        try:
-            if request.agent_type:
-                logger.info(f"Явно указан агент: {request.agent_type}")
-                agent = self._get_agent(request.agent_type)
-                if agent is None:
-                    return ChatResponse(
-                        reply=f"Неизвестный тип агента: {request.agent_type}",
-                        handled_by_agent=False,
-                        document_created=False,
-                        is_error=True,
-                    )
-                result = await agent.run(request.raw_input, request.thread_id)
-                return self._to_response(result)
+    _AGENT_ALIASES: dict[str, str] = {
+        "claims": "claims_agent",
+        "claim": "claims_agent",
+        "claims_agent": "claims_agent",
+        "contract": "contract_agent",
+        "contract_agent": "contract_agent",
+        "general": "general_questions_agent",
+        "general_questions": "general_questions_agent",
+        "general_questions_agent": "general_questions_agent",
+        "router": "router_agent",
+        "router_agent": "router_agent",
+    }
 
+    def resolve_agent_type(self, agent_type: str) -> str | None:
+        key = (agent_type or "").strip().lower()
+        return self._AGENT_ALIASES.get(key)
+
+    async def process_routed(self, request: ChatRequest) -> ChatResponse:
+        try:
             active_agent = await self.claims_agent.get_current_agent(request.thread_id)
             if active_agent == "claims_agent":
                 wants_continue = await self.claims_agent.check_continue_task(
@@ -177,13 +181,18 @@ class AgentService:
                     handled_by_agent=False,
                     document_created=False,
                     is_error=True,
+                    latency_ms=0,
+                    input_tokens=0,
+                    output_tokens=0,
+                    total_tokens=0,
+                    run_id="",
+                    trace_id="",
+                    process_name="router_agent",
                 )
 
             document_type = route_result.get("document_type")
             logger.info(
-                "Маршрут: %s, тип документа для claims: %s",
-                route,
-                document_type or "—",
+                f"Маршрут: {route}, тип документа для claims: {document_type or '—'}"
             )
             if route == "contract_agent":
                 logger.info("Маршрутизация на contract_agent...")
@@ -229,14 +238,91 @@ class AgentService:
                 process_name="agent_service",
             )
 
-    def _get_agent(self, agent_type: str):
-        mapping = {
-            "contract_agent": self.contract_agent,
-            "general_questions_agent": self.general_questions_agent,
-            "claims_agent": self.claims_agent,
-            "router_agent": self.router_agent,
+    async def process_with_agent(
+        self,
+        agent_type: str,
+        request: ChatAgentRequest,
+    ) -> ChatResponse:
+        try:
+            if agent_type == "claims_agent":
+                req_meta = request.request_metadata or {}
+                document_type = req_meta.get("document_type")
+                result = await self.claims_agent.run(
+                    request.raw_input,
+                    request.thread_id,
+                    user_metadata=request.user_metadata or {},
+                    document_type=document_type,
+                )
+            elif agent_type == "contract_agent":
+                result = await self.contract_agent.run(
+                    request.raw_input,
+                    request.thread_id,
+                )
+            elif agent_type == "general_questions_agent":
+                result = await self.general_questions_agent.run(
+                    request.raw_input,
+                    request.thread_id,
+                )
+            elif agent_type == "router_agent":
+                result = self._format_router_direct_response(
+                    await self.router_agent.run(
+                        request.raw_input,
+                        request.thread_id,
+                    )
+                )
+            else:
+                return ChatResponse(
+                    reply=f"Неизвестный тип агента: {agent_type}",
+                    handled_by_agent=False,
+                    document_created=False,
+                    is_error=True,
+                    latency_ms=0,
+                    input_tokens=0,
+                    output_tokens=0,
+                    total_tokens=0,
+                    run_id="",
+                    trace_id="",
+                    process_name="agent_service",
+                )
+
+            check_error(result)
+            return self._to_response(result)
+        except Exception as e:
+            logger.error(
+                f"Ошибка прямого вызова агента {agent_type}: {str(e)}",
+                exc_info=True,
+            )
+            return ChatResponse(
+                reply=f"Ошибка при обработке запроса: {str(e)}",
+                handled_by_agent=False,
+                document_created=False,
+                is_error=True,
+                latency_ms=0,
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                run_id="",
+                trace_id="",
+                process_name=agent_type,
+            )
+
+    @staticmethod
+    def _format_router_direct_response(route_result: dict) -> dict:
+        route = route_result.get("routed_to")
+        doc_type = route_result.get("document_type")
+        if route:
+            reply = f"Классификация: агент={route}"
+            if doc_type:
+                reply += f", тип документа={doc_type}"
+        else:
+            reply = route_result.get("error") or "Не удалось классифицировать запрос."
+        return {
+            "reply": reply,
+            "handled_by_agent": True,
+            "document_created": False,
+            "error": route_result.get("error"),
+            "metadata": route_result.get("metadata", {}),
         }
-        return mapping.get(agent_type.lower(), None)
 
     def _to_response(self, result: dict, metadata: dict | None = None) -> ChatResponse:
         metadata = metadata or result.get("metadata", {})

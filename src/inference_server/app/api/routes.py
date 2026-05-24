@@ -6,7 +6,13 @@ from logger import LoggerFactory
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 
-from ..schemas.chat import ChatRequest, ChatResponse, ChatNameRequest, ChatNameResponse
+from ..schemas.chat import (
+    ChatAgentRequest,
+    ChatRequest,
+    ChatResponse,
+    ChatNameRequest,
+    ChatNameResponse,
+)
 from ..services import AgentService, LLMService
 
 
@@ -70,58 +76,53 @@ async def get_chat_name(
 @router.post("/invoke", response_model=ChatResponse)
 async def ainvoke(
     request: ChatRequest,
-    service: AgentService = Depends(get_agent_service)
+    service: AgentService = Depends(get_agent_service),
 ):
     """
-    Основной эндпоинт для обработки запросов через агентов.
-    
-    Args:
-        request: ChatRequest с полями raw_input, thread_id и опциональным agent_type
-        service: AgentService для обработки
-        
-    Returns:
-        ChatResponse с ответом и метаданными
+    Основной эндпоинт: маршрутизация через router и активные сессии агентов.
+    Выбор агента в теле запроса не поддерживается — только /invoke/{{agent_type}}.
     """
     try:
-        logger.info(f"Получен запрос: thread_id={request.thread_id}, agent_type={request.agent_type}")
-        result = await service.process(request)
+        logger.info(f"Получен запрос: thread_id={request.thread_id}")
+        result = await service.process_routed(request)
         logger.info(f"Запрос обработан успешно: {len(result.reply)} символов в ответе")
         return result
     except Exception as e:
         logger.error(f"Ошибка при обработке запроса: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при обработке запроса: {str(e)}"
+            detail=f"Ошибка при обработке запроса: {str(e)}",
         )
 
 
 @router.post("/invoke/{agent_type}", response_model=ChatResponse)
 async def ainvoke_with_agent_type(
     agent_type: str,
-    request: ChatRequest,
-    service: AgentService = Depends(get_agent_service)
+    request: ChatAgentRequest,
+    service: AgentService = Depends(get_agent_service),
 ):
     """
-    Эндпоинт для обработки запроса конкретным агентом.
-    
-    Args:
-        agent_type: тип агента (contract, general, router)
-        request: ChatRequest
-        service: AgentService для обработки
-        
-    Returns:
-        ChatResponse с ответом и метаданными
+    Прямой вызов указанного агента.
+    agent_type в path: claims_agent, contract_agent, general_questions_agent, router_agent.
+    request_metadata — параметры вызова (например document_type для claims_agent).
     """
-    request.agent_type = agent_type
+    resolved = service.resolve_agent_type(agent_type)
+    if resolved is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Неизвестный агент: {agent_type}. "
+                "Доступны: claims_agent, contract_agent, general_questions_agent, router_agent"
+            ),
+        )
     try:
-        logger.info(f"Получен запрос на агент: {agent_type}, thread_id={request.thread_id}")
-        result = await service.process(request)
-        logger.info(f"Запрос обработан успешно агентом {agent_type}")
+        logger.info(f"Получен запрос на агент: {resolved}, thread_id={request.thread_id}")
+        result = await service.process_with_agent(resolved, request)
+        logger.info(f"Запрос обработан успешно агентом {resolved}")
         return result
     except Exception as e:
-        logger.error(f"Ошибка при обработке запроса на {agent_type}: {str(e)}", exc_info=True)
+        logger.error(f"Ошибка при обработке запроса на {resolved}: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при обработке запроса: {str(e)}"
+            detail=f"Ошибка при обработке запроса: {str(e)}",
         )
-
