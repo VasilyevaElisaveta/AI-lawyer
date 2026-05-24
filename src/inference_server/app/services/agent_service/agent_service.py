@@ -25,14 +25,37 @@ def check_error(result):
         raise Exception(error)
 
 
+def merge_run_metadata(*parts: dict) -> dict:
+    """Объединяет metadata нескольких агентов (router + claims и т.д.)."""
+    merged: dict = {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "total_tokens": 0,
+        "latency_ms": 0,
+        "run_id": "",
+        "trace_id": "",
+        "process_name": "unknown_process",
+    }
+    for part in parts:
+        if not part:
+            continue
+        meta = part.get("metadata") or part
+        for key in ("input_tokens", "output_tokens", "total_tokens", "latency_ms"):
+            merged[key] += int(meta.get(key, 0) or 0)
+        for key in ("run_id", "trace_id", "process_name"):
+            if meta.get(key):
+                merged[key] = meta[key]
+    return merged
+
+
 class AgentService:
     """
     Сервис для управления всеми агентами инференс сервера.
-    
+
     Использует router agent для классификации запроса, затем маршрутизирует
-    к соответствующему агенту (contract_agent, general_agent).
+    к соответствующему агенту. Активная сессия claims_agent (current_agent)
+    обрабатывается до router: проверка продолжения задачи и дополнение полей.
     """
-    
     def __init__(self):
         logger.info("Инициализация AgentService...")
         router_config={
@@ -74,7 +97,8 @@ class AgentService:
         }
         claims_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
-            **DEFAULT_GIGACHAT_PARAMS
+            **DEFAULT_GIGACHAT_PARAMS,
+            "max_tokens": 4096,
         }
         contract_generator_config={
             "metadata": {
@@ -106,15 +130,6 @@ class AgentService:
         logger.info("AgentService инициализирован успешно")
 
     async def process(self, request: ChatRequest) -> ChatResponse:
-        """
-        Обрабатывает запрос пользователя через router или прямой агент.
-        
-        Args:
-            request: ChatRequest с raw_input, thread_id и optional agent_type
-            
-        Returns:
-            ChatResponse с reply и метаданными
-        """
         try:
             if request.agent_type:
                 logger.info(f"Явно указан агент: {request.agent_type}")
@@ -129,25 +144,31 @@ class AgentService:
                 result = await agent.run(request.raw_input, request.thread_id)
                 return self._to_response(result)
 
+            active_agent = await self.claims_agent.get_current_agent(request.thread_id)
+            if active_agent == "claims_agent":
+                wants_continue = await self.claims_agent.check_continue_task(
+                    request.raw_input,
+                    request.thread_id,
+                )
+                if wants_continue:
+                    logger.info("Продолжение сессии claims (дополнение полей)")
+                    result = await self.claims_agent.run(
+                        request.raw_input,
+                        request.thread_id,
+                        user_metadata=request.user_metadata,
+                    )
+                    check_error(result)
+                    return self._to_response(result, metadata=result.get("metadata"))
+
+                logger.info("Пользователь сменил тему — сброс сессии claims, маршрутизация")
+                await self.claims_agent.clear_session(request.thread_id)
+
             logger.info("Использование router agent для классификации...")
             route_result = await self.router_agent.run(
                 request.raw_input,
                 request.thread_id,
             )
-
             check_error(route_result)
-
-            if not route_result.get("fields_ready", False):
-                reply = route_result.get("reply") or (
-                    "Для продолжения укажите недостающие данные."
-                )
-                logger.info("Router: ожидание дополнения полей пользователем")
-                return self._to_response({
-                    "reply": reply,
-                    "handled_by_agent": True,
-                    "document_created": False,
-                    "metadata": route_result.get("metadata", {}),
-                })
 
             route = route_result.get("routed_to")
             if not route:
@@ -158,10 +179,12 @@ class AgentService:
                     is_error=True,
                 )
 
-            logger.info(f"Запрос классифицирован как: {route}")
-            input_data = route_result.get("input_data")
             document_type = route_result.get("document_type")
-
+            logger.info(
+                "Маршрут: %s, тип документа для claims: %s",
+                route,
+                document_type or "—",
+            )
             if route == "contract_agent":
                 logger.info("Маршрутизация на contract_agent...")
                 result = await self.contract_agent.run(request.raw_input, request.thread_id)
@@ -171,36 +194,39 @@ class AgentService:
                     request.raw_input,
                     request.thread_id,
                     user_metadata=request.user_metadata,
-                    input_data=input_data,
                     document_type=document_type,
                 )
             elif route == "general_questions_agent":
-                logger.info("Маршрутизация на general_agent...")
-                message = request.raw_input
-                if input_data and input_data.get("question"):
-                    message = input_data["question"]
-                result = await self.general_questions_agent.run(message, request.thread_id)
+                logger.info("Маршрутизация на general_questions_agent...")
+                result = await self.general_questions_agent.run(
+                    request.raw_input,
+                    request.thread_id,
+                )
             else:
                 logger.warning(f"Неизвестный маршрут: {route}, используем general_questions_agent")
-                result = await self.general_questions_agent.run(request.raw_input, request.thread_id)
+                result = await self.general_questions_agent.run(
+                    request.raw_input,
+                    request.thread_id,
+                )
 
             check_error(result)
+            combined_meta = merge_run_metadata(route_result, result)
+            return self._to_response(result, metadata=combined_meta)
 
-            if result.get("task_completed"):
-                logger.info("Задача завершена — сброс current_agent в router")
-                await self.router_agent.clear_current_agent(request.thread_id)
-
-            response = self._to_response(result)
-            logger.info(f"Ответ готов: {len(response.reply)} символов")
-            return response
-            
         except Exception as e:
             logger.error(f"Ошибка при обработке запроса: {str(e)}", exc_info=True)
             return ChatResponse(
                 reply=f"Ошибка при обработке запроса: {str(e)}",
                 handled_by_agent=False,
                 document_created=False,
-                is_error=True
+                is_error=True,
+                latency_ms=0,
+                input_tokens=0,
+                output_tokens=0,
+                total_tokens=0,
+                run_id="",
+                trace_id="",
+                process_name="agent_service",
             )
 
     def _get_agent(self, agent_type: str):
@@ -212,8 +238,8 @@ class AgentService:
         }
         return mapping.get(agent_type.lower(), None)
 
-    def _to_response(self, result: dict) -> ChatResponse:
-        metadata = result.get("metadata", {})
+    def _to_response(self, result: dict, metadata: dict | None = None) -> ChatResponse:
+        metadata = metadata or result.get("metadata", {})
         return ChatResponse(
             reply=result.get("reply", ""),
             handled_by_agent=result.get("handled_by_agent", True),

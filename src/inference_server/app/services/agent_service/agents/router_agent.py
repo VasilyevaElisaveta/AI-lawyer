@@ -14,21 +14,10 @@ class RouterGraphAgent(BaseGraphAgent):
         response = result.get("response", {})
         metadata = result.get("metadata", {})
         metadata["process_name"] = "router_agent"
-        error = response.get("error", None)
-        routed_to = response.get("routed_to", None)
-        fields_complete = response.get("fields_complete", False)
-        missing_fields_reply = response.get("missing_fields_reply")
-
         return {
-            "routed_to": routed_to,
-            "error": error,
+            "routed_to": response.get("routed_to"),
+            "document_type": response.get("document_type"),
+            "error": response.get("error"),
             "handled_by_agent": True,
             "metadata": metadata,
-            "fields_ready": bool(fields_complete),
-            "reply": missing_fields_reply,
-            "input_data": response.get("agent_fields"),
-            "document_type": response.get("document_type"),
         }
-
-    async def clear_current_agent(self, thread_id: str) -> None:
-        await self.agent.clear_current_agent(thread_id)
