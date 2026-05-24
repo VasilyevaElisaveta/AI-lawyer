@@ -14,7 +14,7 @@ from .nodes import answer_node, clear_previous_run_results, clear_before_end
 from .state import GeneralQuestionAgentState
 
 
-logger = logger = LoggerFactory.get_logger(
+logger = LoggerFactory.get_logger(
     name=__name__,
     logs_path=os.getenv("LOGS_DIR"),
     log_file=os.getenv("LOGS_FILE") if os.getenv("MODE") != "DEBUG" else None,

@@ -1,59 +1,77 @@
 from typing import Any
 
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, RemoveMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
 
-from .config import SUMMARY_TRIGGER_TOKENS, KEEP_LAST_MESSAGES
-from .token_counter import TokenCounter
+from .config import KEEP_RECENT_MESSAGES, MAX_MESSAGES_WITHOUT_SUMMARY
 from .summarizer import summarize_messages
+
+
+def _split_for_summary(
+    messages: list[BaseMessage],
+) -> tuple[list[BaseMessage], list[BaseMessage], str | None]:
+    previous_summary = None
+    if messages and isinstance(messages[0], SystemMessage):
+        previous_summary = str(messages[0].content or "")
+
+    if KEEP_RECENT_MESSAGES <= 0:
+        old = list(messages)
+        recent: list[BaseMessage] = []
+    else:
+        recent = messages[-KEEP_RECENT_MESSAGES:]
+        old = messages[:-KEEP_RECENT_MESSAGES]
+
+    if old and isinstance(old[0], SystemMessage):
+        old = old[1:]
+
+    return old, recent, previous_summary
 
 
 async def memory_node(
     state: dict[str, Any],
     llm,
-    config: RunnableConfig | None = None
+    config: RunnableConfig | None = None,
 ) -> dict[str, Any]:
-    """Сокращает историю сообщений и создаёт сводку при переполнении контекста."""
-    messages: list[BaseMessage] = state.get("messages") or []
+    messages: list[BaseMessage] = list(state.get("messages") or [])
+    raw_input = (state.get("raw_input") or "").strip()
 
-    raw_input = state.get("raw_input", "")
+    new_human: HumanMessage | None = None
     if raw_input:
-        if not messages or getattr(messages[-1], "content", None) != raw_input:
-            messages.append(HumanMessage(content=raw_input))
+        last_content = getattr(messages[-1], "content", None) if messages else None
+        if last_content != raw_input:
+            new_human = HumanMessage(content=raw_input)
+            messages.append(new_human)
 
-    state["messages"] = messages
+    if len(messages) <= MAX_MESSAGES_WITHOUT_SUMMARY:
+        if new_human:
+            return {"messages": [new_human]}
+        return {}
 
-    if not messages:
-        return dict(state)
-
-    counter = TokenCounter(llm)
-    tokens = counter.count_messages_tokens(messages)
-    state["total_tokens"] = tokens
-
-    if tokens < SUMMARY_TRIGGER_TOKENS:
-        return dict(state)
-
-    if len(messages) <= KEEP_LAST_MESSAGES:
-        return dict(state)
-
-    old_messages = messages[:-KEEP_LAST_MESSAGES]
-
-    previous_summary = state.get("conversation_summary")
+    old_messages, recent, summary_from_system = _split_for_summary(messages)
+    previous_summary = state.get("conversation_summary") or summary_from_system
 
     summary, metadata = await summarize_messages(
         state,
         old_messages,
         llm,
         previous_summary,
-        config=config
+        config=config,
     )
 
-    state["usage_metadata"] = metadata
+    summary_message = SystemMessage(
+        content=f"Сводка предыдущей беседы:\n{summary}",
+    )
 
-    state["conversation_summary"] = summary
+    compacted: list[BaseMessage] = [summary_message, *recent]
+    if KEEP_RECENT_MESSAGES <= 0 and new_human is not None:
+        compacted.append(new_human)
 
-    new_messages = messages[-KEEP_LAST_MESSAGES:]
-    summary_message = SystemMessage(content=f"Сводка предыдущей беседы:\n{summary}")
-    state["messages"] = [summary_message, *new_messages]
-
-    return dict(state)
+    return {
+        "messages": [
+            RemoveMessage(id=REMOVE_ALL_MESSAGES),
+            *compacted,
+        ],
+        "conversation_summary": summary,
+        "usage_metadata": metadata,
+    }
