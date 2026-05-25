@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, AsyncIterator
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.checkpoint.memory import MemorySaver
@@ -78,32 +78,83 @@ class GeneralQuestionsAgent:
             "raw_input": user_message
         }
 
+    def _config(self, thread_id: str) -> dict[str, Any]:
+        return {
+            "run_name": "GeneralQuestionAgent",
+            "configurable": {"thread_id": thread_id},
+        }
+
+    @staticmethod
+    def _build_metadata(traced_runs, usage: dict[str, Any]) -> dict[str, Any]:
+        if not traced_runs:
+            return {
+                "run_id": "",
+                "trace_id": "",
+                "latency_ms": 0,
+                "input_tokens": int(usage.get("input_tokens", 0) or 0),
+                "output_tokens": int(usage.get("output_tokens", 0) or 0),
+                "total_tokens": int(usage.get("total_tokens", 0) or 0),
+            }
+        root_run = traced_runs[-1]
+        latency_ms = 0
+        if root_run.start_time and root_run.end_time:
+            latency_ms = int(
+                (root_run.end_time - root_run.start_time).total_seconds() * 1000
+            )
+        return {
+            "run_id": str(root_run.id),
+            "trace_id": str(root_run.trace_id),
+            "latency_ms": latency_ms,
+            "input_tokens": int(usage.get("input_tokens", 0) or 0),
+            "output_tokens": int(usage.get("output_tokens", 0) or 0),
+            "total_tokens": int(usage.get("total_tokens", 0) or 0),
+        }
+
     async def process_user_message(self, user_message: str, thread_id: str) -> dict[str, Any]:
         input_state = self._build_input_state(user_message)
 
         with collect_runs() as runs_cb:
             response = await self.graph.ainvoke(
                 input_state,
-                config={
-                    "run_name": "GeneralQuestionAgent",
-                    "configurable": {
-                        "thread_id": thread_id
-                    }
-                }
+                config=self._config(thread_id),
             )
-        root_run = runs_cb.traced_runs[-1]
         logger.debug(f"Got response: {response}")
-        usage = response.get("usage_metadata", {})
+        usage = response.get("usage_metadata", {}) or {}
         result = {
             "response": response,
-            "metadata": {
-                "run_id": str(root_run.id),
-                "trace_id": str(root_run.trace_id),
-                "latency_ms": int((root_run.end_time - root_run.start_time).total_seconds() * 1000),
-                "input_tokens": int(usage.get("input_tokens", 0) or 0),
-                "output_tokens": int(usage.get("output_tokens", 0) or 0),
-                "total_tokens": int(usage.get("total_tokens", 0) or 0),
-            },
+            "metadata": self._build_metadata(runs_cb.traced_runs, usage),
         }
         logger.debug(f"Got result: {result}")
         return result
+
+    async def astream_user_message(
+        self,
+        user_message: str,
+        thread_id: str,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """
+        Стриминговая обработка: пропускает чанки ответа LLM из custom-канала
+        графа и в конце отдаёт итоговый result со всей метаинформацией.
+        """
+        input_state = self._build_input_state(user_message)
+        config = self._config(thread_id)
+
+        with collect_runs() as runs_cb:
+            async for stream_mode, payload in self.graph.astream(
+                input_state,
+                config=config,
+                stream_mode=["custom", "values"],
+            ):
+                if stream_mode == "custom":
+                    yield {"channel": "progress", "data": payload}
+
+        snapshot = await self.graph.aget_state(config)
+        final_values: dict[str, Any] = snapshot.values if snapshot else {}
+        usage = final_values.get("usage_metadata", {}) or {}
+        metadata = self._build_metadata(runs_cb.traced_runs, usage)
+
+        result = {
+            "response": final_values,
+            "metadata": metadata,
+        }
+        yield {"channel": "result", "data": result}

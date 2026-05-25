@@ -104,4 +104,9 @@ class ClaimsAgentState(TypedDict, total=False):
     pipeline_status: str            # "in_progress" | "completed" | "completed_with_errors" | "failed"
     error: str                      # Описание ошибки (если есть)
 
+    # ── Прогрессивные сообщения LLM (для UI / стриминга) ──────
+    # Отдельный канал, чтобы не смешивать с обычным reply диалога.
+    pre_generation_message: str     # «приступаю к генерации …» — после успешной валидации
+    final_reply_text: str           # итоговое сообщение после генерации документа
+
     usage_metadata: dict[str, Any]

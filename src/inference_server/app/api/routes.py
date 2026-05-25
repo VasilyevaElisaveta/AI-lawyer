@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime
 from typing import Dict, Any
@@ -5,6 +6,7 @@ from typing import Dict, Any
 from logger import LoggerFactory
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import StreamingResponse
 
 from ..schemas.chat import (
     ChatAgentRequest,
@@ -93,6 +95,77 @@ async def ainvoke(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Ошибка при обработке запроса: {str(e)}",
         )
+
+
+def _ndjson_stream(events_iter):
+    """Оборачивает async-итератор словарей в NDJSON-поток для StreamingResponse."""
+    async def generator():
+        try:
+            async for event in events_iter:
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+        except Exception as exc:
+            logger.error("Ошибка стриминга: %s", exc, exc_info=True)
+            yield json.dumps(
+                {"type": "error", "message": f"Внутренняя ошибка стриминга: {exc}"},
+                ensure_ascii=False,
+            ) + "\n"
+
+    return generator()
+
+
+@router.post("/invoke/stream")
+async def ainvoke_stream(
+    request: ChatRequest,
+    service: AgentService = Depends(get_agent_service),
+):
+    """
+    Стриминговый аналог /invoke. Возвращает NDJSON-поток событий:
+      - {"type": "progress", "stage": "pre_generation"|"post_generation"|"answer",
+         "content": "...", "document_type": "..."}
+      - {"type": "result", "reply": "...", "final_reply_text": "...", ...}
+      - {"type": "error",  "message": "..."}
+
+    Для claims_agent stage = pre_generation / post_generation (статус-сообщения
+    «приступаю к генерации» и итоговое после DOCX).
+    Для general_questions_agent stage = answer (потоковые токены ответа LLM).
+    Для contract_agent промежуточных событий пока нет — приходит только result.
+    """
+    logger.info(f"Stream-запрос: thread_id={request.thread_id}")
+    events = service.process_routed_stream(request)
+    return StreamingResponse(
+        _ndjson_stream(events),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
+
+
+@router.post("/invoke/{agent_type}/stream")
+async def ainvoke_with_agent_type_stream(
+    agent_type: str,
+    request: ChatAgentRequest,
+    service: AgentService = Depends(get_agent_service),
+):
+    """
+    Стриминговый аналог /invoke/{agent_type}. Формат событий тот же,
+    что у /invoke/stream. Промежуточные события приходят для claims_agent
+    (pre_generation/post_generation) и general_questions_agent (answer).
+    """
+    resolved = service.resolve_agent_type(agent_type)
+    if resolved is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"Неизвестный агент: {agent_type}. "
+                "Доступны: claims_agent, contract_agent, general_questions_agent, router_agent"
+            ),
+        )
+    logger.info(f"Stream-запрос на агент {resolved}, thread_id={request.thread_id}")
+    events = service.process_with_agent_stream(resolved, request)
+    return StreamingResponse(
+        _ndjson_stream(events),
+        media_type="application/x-ndjson",
+        headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
+    )
 
 
 @router.post("/invoke/{agent_type}", response_model=ChatResponse)

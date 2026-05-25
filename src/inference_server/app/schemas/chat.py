@@ -38,6 +38,7 @@ class ChatAgentRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    final_reply_text: str = ""
     handled_by_agent: bool = True
     document_created: bool = False
     is_error: bool = False

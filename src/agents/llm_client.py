@@ -13,6 +13,7 @@ DEFAULT_GIGACHAT_PARAMS = {
     "top_p": 0.1,
     "max_tokens": 128,
     "timeout": 120,
+    "streaming": True,
 }
 
 

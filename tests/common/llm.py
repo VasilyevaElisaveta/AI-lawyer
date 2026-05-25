@@ -15,6 +15,7 @@ def build_llm(max_tokens: int = 1024, temperature: float = 0.0):
         "credentials": os.getenv("SBER_AUTH"),
         **DEFAULT_GIGACHAT_PARAMS,
         "max_tokens": max_tokens,
+        "streaming": False,
     }
     return create_gigachat(
         os.getenv("LLM_MODEL", "GigaChat"),

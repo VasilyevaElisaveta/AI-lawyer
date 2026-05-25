@@ -1,8 +1,24 @@
-from typing import Any
+from typing import Any, AsyncIterator
 
 from agents.claims_agent import ClaimsAgent
 
 from .base import BaseGraphAgent
+
+
+def _shape_run_result(result: dict[str, Any]) -> dict[str, Any]:
+    metadata = result.get("metadata", {}) or {}
+    metadata["process_name"] = "claims_agent"
+    return {
+        "reply": result.get("reply", ""),
+        "final_reply_text": result.get("final_reply_text", ""),
+        "handled_by_agent": result.get("handled_by_agent", True),
+        "document_created": result.get("document_created", False),
+        "awaiting_input": result.get("awaiting_input", False),
+        "current_agent": result.get("current_agent"),
+        "task_completed": result.get("task_completed", False),
+        "metadata": metadata,
+        "error": result.get("error"),
+    }
 
 
 class ClaimsGraphAgent(BaseGraphAgent):
@@ -32,15 +48,24 @@ class ClaimsGraphAgent(BaseGraphAgent):
             user_metadata=user_metadata,
             document_type=document_type or "lawsuit",
         )
-        metadata = result.get("metadata", {}) or {}
-        metadata["process_name"] = "claims_agent"
-        return {
-            "reply": result.get("reply", ""),
-            "handled_by_agent": result.get("handled_by_agent", True),
-            "document_created": result.get("document_created", False),
-            "awaiting_input": result.get("awaiting_input", False),
-            "current_agent": result.get("current_agent"),
-            "task_completed": result.get("task_completed", False),
-            "metadata": metadata,
-            "error": result.get("error"),
-        }
+        return _shape_run_result(result)
+
+    async def astream(
+            self,
+            message: str,
+            thread_id: str,
+            user_metadata: dict[str, Any] | None = None,
+            document_type: str | None = None,
+        ) -> AsyncIterator[dict[str, Any]]:
+        """Стримит progress-события + финальный result."""
+        user_metadata = user_metadata or {}
+        async for event in self.agent.astream_user_message(
+            message,
+            thread_id,
+            user_metadata=user_metadata,
+            document_type=document_type or "lawsuit",
+        ):
+            if event.get("channel") == "result":
+                yield {"channel": "result", "data": _shape_run_result(event["data"])}
+            else:
+                yield event

@@ -1,4 +1,5 @@
 import os
+from typing import AsyncIterator
 
 from logger import LoggerFactory
 
@@ -328,6 +329,7 @@ class AgentService:
         metadata = metadata or result.get("metadata", {})
         return ChatResponse(
             reply=result.get("reply", ""),
+            final_reply_text=result.get("final_reply_text", ""),
             handled_by_agent=result.get("handled_by_agent", True),
             document_created=result.get("document_created", False),
             is_error=result.get("is_error", False),
@@ -339,3 +341,216 @@ class AgentService:
             trace_id=str(metadata.get("trace_id")),
             process_name=metadata.get("process_name", "unknown_process")
         )
+
+    async def process_routed_stream(
+        self,
+        request: ChatRequest,
+    ) -> AsyncIterator[dict]:
+        """
+        Стриминговая версия process_routed.
+
+        Yield-ит словари формата:
+          {"type": "progress", "stage": "...", "content": "...", ...}
+          {"type": "result",   "reply": ..., "document_created": ..., ...}
+          {"type": "error",    "message": "..."}
+
+        Стримятся только события из claims_agent (pre/post-generation).
+        Для остальных агентов отдаётся один финальный result.
+        """
+        try:
+            active_agent = await self.claims_agent.get_current_agent(request.thread_id)
+            wants_continue = False
+            if active_agent == "claims_agent":
+                wants_continue = await self.claims_agent.check_continue_task(
+                    request.raw_input,
+                    request.thread_id,
+                )
+                if not wants_continue:
+                    logger.info(
+                        "Stream: пользователь сменил тему — сброс сессии claims",
+                    )
+                    await self.claims_agent.clear_session(request.thread_id)
+
+            if active_agent == "claims_agent" and wants_continue:
+                logger.info("Stream: продолжение сессии claims_agent")
+                async for event in self.claims_agent.astream(
+                    request.raw_input,
+                    request.thread_id,
+                    user_metadata=request.user_metadata,
+                ):
+                    yield _shape_stream_event(event)
+                return
+
+            logger.info("Stream: маршрутизация через router_agent")
+            route_result = await self.router_agent.run(
+                request.raw_input,
+                request.thread_id,
+            )
+            check_error(route_result)
+            route = route_result.get("routed_to")
+            if not route:
+                yield {
+                    "type": "error",
+                    "message": route_result.get("error") or "Не удалось определить агента.",
+                }
+                return
+
+            document_type = route_result.get("document_type")
+            if route == "claims_agent":
+                async for event in self.claims_agent.astream(
+                    request.raw_input,
+                    request.thread_id,
+                    user_metadata=request.user_metadata,
+                    document_type=document_type,
+                ):
+                    if event.get("channel") == "result":
+                        # Прибавляем токены router_agent к итоговой метаинформации.
+                        result_data = event["data"]
+                        result_data["metadata"] = merge_run_metadata(
+                            route_result,
+                            result_data,
+                        )
+                        yield _shape_stream_event(event)
+                    else:
+                        yield _shape_stream_event(event)
+                return
+
+            if route == "general_questions_agent":
+                async for event in self.general_questions_agent.astream(
+                    request.raw_input,
+                    request.thread_id,
+                ):
+                    if event.get("channel") == "result":
+                        result_data = event["data"]
+                        result_data["metadata"] = merge_run_metadata(
+                            route_result,
+                            result_data,
+                        )
+                        yield _shape_stream_event(event)
+                    else:
+                        yield _shape_stream_event(event)
+                return
+
+            # contract_agent / неизвестный маршрут — пока без стрима.
+            # if route == "contract_agent":
+            #     result = await self.contract_agent.run(
+            #         request.raw_input,
+            #         request.thread_id,
+            #     )
+            else:
+                logger.warning(
+                    "Stream: неизвестный маршрут %s, используем general_questions_agent",
+                    route,
+                )
+                async for event in self.general_questions_agent.astream(
+                    request.raw_input,
+                    request.thread_id,
+                ):
+                    if event.get("channel") == "result":
+                        result_data = event["data"]
+                        result_data["metadata"] = merge_run_metadata(
+                            route_result,
+                            result_data,
+                        )
+                        yield _shape_stream_event(event)
+                    else:
+                        yield _shape_stream_event(event)
+                return
+        except Exception as e:
+            logger.error("Ошибка стриминговой обработки: %s", e, exc_info=True)
+            yield {
+                "type": "error",
+                "message": f"Ошибка при обработке запроса: {str(e)}",
+            }
+
+    async def process_with_agent_stream(
+        self,
+        agent_type: str,
+        request: ChatAgentRequest,
+    ) -> AsyncIterator[dict]:
+        """Прямой вызов агента в режиме стрима (claims_agent, general_questions_agent)."""
+        try:
+            if agent_type == "claims_agent":
+                req_meta = request.request_metadata or {}
+                document_type = req_meta.get("document_type")
+                async for event in self.claims_agent.astream(
+                    request.raw_input,
+                    request.thread_id,
+                    user_metadata=request.user_metadata or {},
+                    document_type=document_type,
+                ):
+                    yield _shape_stream_event(event)
+                return
+
+            if agent_type == "general_questions_agent":
+                async for event in self.general_questions_agent.astream(
+                    request.raw_input,
+                    request.thread_id,
+                ):
+                    yield _shape_stream_event(event)
+                return
+
+            # Контракт-агент и router пока без стрима.
+            if agent_type == "contract_agent":
+                result = await self.contract_agent.run(
+                    request.raw_input,
+                    request.thread_id,
+                )
+            elif agent_type == "router_agent":
+                result = self._format_router_direct_response(
+                    await self.router_agent.run(
+                        request.raw_input,
+                        request.thread_id,
+                    )
+                )
+            else:
+                yield {
+                    "type": "error",
+                    "message": f"Неизвестный тип агента: {agent_type}",
+                }
+                return
+
+            check_error(result)
+            yield _shape_stream_event({"channel": "result", "data": result})
+
+        except Exception as e:
+            logger.error(
+                "Ошибка стриминга агента %s: %s", agent_type, e, exc_info=True,
+            )
+            yield {
+                "type": "error",
+                "message": f"Ошибка при обработке запроса: {str(e)}",
+            }
+
+
+def _shape_stream_event(event: dict) -> dict:
+    """Нормализует внутреннее событие графа к внешнему контракту /invoke/stream."""
+    channel = event.get("channel")
+    if channel == "progress":
+        payload = event.get("data") or {}
+        return {
+            "type": "progress",
+            "stage": payload.get("stage", "progress"),
+            "document_type": payload.get("document_type"),
+            "content": payload.get("content", ""),
+        }
+    if channel == "result":
+        data = event.get("data") or {}
+        metadata = data.get("metadata") or {}
+        return {
+            "type": "result",
+            "reply": data.get("reply", ""),
+            "final_reply_text": data.get("final_reply_text", ""),
+            "handled_by_agent": data.get("handled_by_agent", True),
+            "document_created": data.get("document_created", False),
+            "is_error": bool(data.get("error")),
+            "error": data.get("error"),
+            "latency_ms": metadata.get("latency_ms", 0),
+            "input_tokens": metadata.get("input_tokens", 0),
+            "output_tokens": metadata.get("output_tokens", 0),
+            "total_tokens": metadata.get("total_tokens", 0),
+            "run_id": str(metadata.get("run_id", "")),
+            "trace_id": str(metadata.get("trace_id", "")),
+            "process_name": metadata.get("process_name", "unknown_process"),
+        }
+    return {"type": event.get("type", "progress"), **event}

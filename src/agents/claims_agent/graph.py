@@ -2,8 +2,7 @@
 Агент для генерации исковых заявлений и претензий.
 """
 import os
-import asyncio
-from typing import Any
+from typing import Any, AsyncIterator
 from logger import LoggerFactory
 
 from langchain_core.tracers.context import collect_runs
@@ -22,7 +21,9 @@ from .nodes import (
     calculator_node,
     generator_node,
     qa_node,
-    evaluate_continue_task
+    pre_generation_notify_node,
+    final_reply_node,
+    evaluate_continue_task,
 )
 from .utils.docx_generator import (
     build_docx_filename,
@@ -128,17 +129,29 @@ class ClaimsAgent:
         def _finalize_node_wrapper(state: ClaimsAgentState):
             return self._finalize_node(state)
 
+        async def pre_generation_notify_wrapper(
+            state: ClaimsAgentState, config: RunnableConfig,
+        ):
+            return await pre_generation_notify_node(state, llm, config)
+
+        async def final_reply_wrapper(
+            state: ClaimsAgentState, config: RunnableConfig,
+        ):
+            return await final_reply_node(state, llm, config)
+
         builder = StateGraph(ClaimsAgentState)
 
         # Узлы
         builder.add_node("intake", intake_node_wrapper)
         builder.add_node("case_analysis", case_analysis_node_wrapper)
         builder.add_node("validation", validation_node_wrapper)
+        builder.add_node("pre_generation_notify", pre_generation_notify_wrapper)
         builder.add_node("research", research_node_wrapper)
         builder.add_node("calculator", calculator_node_wrapper)
         builder.add_node("generator", generator_node_wrapper)
         builder.add_node("qa", qa_node_wrapper)
         builder.add_node("finalize", _finalize_node_wrapper)
+        builder.add_node("final_reply", final_reply_wrapper)
 
         # Рёбра
         builder.set_entry_point("intake")
@@ -146,8 +159,13 @@ class ClaimsAgent:
         builder.add_conditional_edges(
             "validation",
             self._route_after_validation,
-            {"case_analysis": "case_analysis", "intake": "intake", END: END},
+            {
+                "pre_generation_notify": "pre_generation_notify",
+                "intake": "intake",
+                END: END,
+            },
         )
+        builder.add_edge("pre_generation_notify", "case_analysis")
         builder.add_edge("case_analysis", "research")
 
         builder.add_edge("research", "calculator")
@@ -161,14 +179,19 @@ class ClaimsAgent:
             {"finalize": "finalize", "generator": "generator"},
         )
 
-        builder.add_edge("finalize", END)
+        builder.add_conditional_edges(
+            "finalize",
+            self._route_after_finalize,
+            {"final_reply": "final_reply", END: END},
+        )
+        builder.add_edge("final_reply", END)
 
         return builder.compile(checkpointer=self.memory)
 
     def _route_after_validation(self, state: ClaimsAgentState) -> str:
         if state.get("is_valid", False):
             logger.info("[claims] обязательные поля заполнены — анализ дела и генерация")
-            return "case_analysis"
+            return "pre_generation_notify"
         attempts = state_int(state, "validation_attempts", 0)
         has_raw = bool(state.get("raw_input"))
         if has_raw and attempts < 2:
@@ -178,6 +201,12 @@ class ClaimsAgent:
             "[claims] остановка: ждём данные от пользователя — %s",
             state.get("validation_errors", []),
         )
+        return END
+
+    def _route_after_finalize(self, state: ClaimsAgentState) -> str:
+        """После finalize: если документ сохранён — генерируем итоговое сообщение."""
+        if state.get("document_path"):
+            return "final_reply"
         return END
 
     def _route_after_qa(self, state: ClaimsAgentState) -> str:
@@ -195,7 +224,7 @@ class ClaimsAgent:
 
     def _finalize_node(self, state: ClaimsAgentState) -> dict[str, Any]:
         """Финализация: генерация DOCX в base64."""
-        logger.info("[claims][финал] сохранение DOCX")
+        logger.info("[claims][final] сохранение DOCX")
 
         document_text = state.get("generated_document", "")
         document_type = state.get("document_type", _DEFAULT_DOCUMENT_TYPE)
@@ -235,11 +264,7 @@ class ClaimsAgent:
             )
             docx_file = resolve_unique_docx_path(docx_directory, filename)
             save_docx_file(docx_bytes, docx_file)
-            logger.info(
-                "DOCX saved: %s (%d bytes)",
-                os.path.basename(docx_file),
-                len(docx_bytes),
-            )
+            logger.info(f"DOCX saved: {os.path.basename(docx_file)} ({len(docx_bytes)} bytes)")
 
             return {
                 "final_document": document_text,
@@ -324,11 +349,7 @@ class ClaimsAgent:
             initial_state["user_metadata"] = user_metadata
 
             with collect_runs() as runs_cb:
-                final_state = await asyncio.to_thread(
-                    self.graph.invoke,
-                    initial_state,
-                    config,
-                )
+                final_state = await self.graph.ainvoke(initial_state, config)
             root_run = runs_cb.traced_runs[-1]
 
 
@@ -358,6 +379,104 @@ class ClaimsAgent:
                 "error": str(e),
             }
 
+    async def astream_user_message(
+        self,
+        user_message: str,
+        thread_id: str,
+        user_metadata: dict[str, Any] | None = None,
+        document_type: str = _DEFAULT_DOCUMENT_TYPE,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """
+        Стриминговый вариант обработки.
+
+        Прокидывает наружу события из custom-канала LangGraph
+        (pre_generation_notify_node / final_reply_node), а в конце —
+        итоговый result, собранный из финального state с metadata.
+        """
+        logger.info(f"[claims][stream] сообщение thread={thread_id}")
+        user_metadata = {**(user_metadata or {}), "thread_id": thread_id}
+
+        try:
+            import json as _json
+            try:
+                input_data = _json.loads(user_message)
+                if "document_type" in input_data:
+                    document_type = input_data["document_type"]
+                initial_state: dict[str, Any] = {"input_data": input_data}
+            except _json.JSONDecodeError:
+                initial_state = {"raw_input": user_message}
+
+            initial_state["validation_attempts"] = 0
+            initial_state["validation_errors"] = []
+            initial_state["qa_attempts"] = 0
+            config = {"configurable": {"thread_id": thread_id}}
+
+            await self._reset_usage_counters(config)
+            snapshot = await self.graph.aget_state(config)
+            prev = snapshot.values if snapshot else {}
+
+            if prev.get("current_agent") == "claims_agent":
+                if prev.get("document_type"):
+                    document_type = prev["document_type"]
+            else:
+                if prev:
+                    await self.clear_session(thread_id)
+
+            if document_type not in _DOCUMENT_TYPES:
+                logger.warning(f"Unknown document_type '{document_type}', falling back to '{_DEFAULT_DOCUMENT_TYPE}'")
+                document_type = _DEFAULT_DOCUMENT_TYPE
+
+            initial_state["document_type"] = document_type
+            initial_state["document_type_locked"] = True
+            initial_state["request_id"] = thread_id
+            initial_state["user_metadata"] = user_metadata
+
+            with collect_runs() as runs_cb:
+                async for stream_mode, payload in self.graph.astream(
+                    initial_state,
+                    config=config,
+                    stream_mode=["custom", "values"],
+                ):
+                    if stream_mode == "custom":
+                        yield {"channel": "progress", "data": payload}
+
+            final_state = await self.graph.aget_state(config)
+            final_values = final_state.values if final_state else {}
+
+            usage = resolve_run_usage(
+                final_values.get("usage_metadata"),
+                runs_cb.traced_runs,
+            )
+            root_run = runs_cb.traced_runs[-1] if runs_cb.traced_runs else None
+            metadata = {
+                "run_id": str(root_run.id) if root_run else "",
+                "trace_id": str(root_run.trace_id) if root_run else "",
+                "latency_ms": (
+                    int((root_run.end_time - root_run.start_time).total_seconds() * 1000)
+                    if root_run and root_run.end_time and root_run.start_time
+                    else 0
+                ),
+                "input_tokens": usage["input_tokens"],
+                "output_tokens": usage["output_tokens"],
+                "total_tokens": usage["total_tokens"],
+            }
+
+            response = self._format_response(final_values)
+            response["metadata"] = metadata
+            yield {"channel": "result", "data": response}
+
+        except Exception as e:
+            logger.error("Stream processing failed: %s", e, exc_info=True)
+            yield {
+                "channel": "result",
+                "data": {
+                    "reply": f"Произошла ошибка при обработке запроса: {str(e)}",
+                    "handled_by_agent": True,
+                    "document_created": False,
+                    "error": str(e),
+                },
+            }
+
     def _format_response(self, state: ClaimsAgentState) -> dict[str, Any]:
         """Форматирование финального ответа."""
         pipeline_status = state.get("pipeline_status", "unknown")
@@ -369,6 +488,7 @@ class ClaimsAgent:
             logger.debug(f"Got document path: {document_path}")
             return {
                 "reply": document_path,
+                "final_reply_text": state.get("final_reply_text") or "",
                 "handled_by_agent": True,
                 "document_created": True,
                 "document_type": document_type,
