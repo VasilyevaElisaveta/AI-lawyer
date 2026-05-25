@@ -120,15 +120,18 @@ async def ainvoke_stream(
 ):
     """
     Стриминговый аналог /invoke. Возвращает NDJSON-поток событий:
-      - {"type": "progress", "stage": "pre_generation"|"post_generation"|"answer",
+      - {"type": "progress", "stage": "pre_generation"|"document_comment"|"answer",
          "content": "...", "document_type": "..."}
-      - {"type": "result", "reply": "...", "final_reply_text": "...", ...}
+      - {"type": "result", "reply": "...", "document_comment": "...", ...}
       - {"type": "error",  "message": "..."}
 
-    Для claims_agent stage = pre_generation / post_generation (статус-сообщения
-    «приступаю к генерации» и итоговое после DOCX).
-    Для general_questions_agent stage = answer (потоковые токены ответа LLM).
-    Для contract_agent промежуточных событий пока нет — приходит только result.
+    Для claims_agent:
+      - stage="pre_generation" — короткий системный статус «приступаю к генерации»
+        (отдельный системный пузырь, не пользовательское сообщение);
+      - stage="document_comment" — обычное сообщение ассистента после генерации
+        DOCX, к которому фронт прикладывает созданный документ (путь — в reply
+        у финального result).
+    Для general_questions_agent stage="answer" (потоковые токены ответа LLM).
     """
     logger.info(f"Stream-запрос: thread_id={request.thread_id}")
     events = service.process_routed_stream(request)
@@ -137,6 +140,9 @@ async def ainvoke_stream(
         media_type="application/x-ndjson",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
     )
+
+
+_AVAILABLE_AGENTS_HINT = "claims_agent, general_questions_agent, router_agent"
 
 
 @router.post("/invoke/{agent_type}/stream")
@@ -148,16 +154,13 @@ async def ainvoke_with_agent_type_stream(
     """
     Стриминговый аналог /invoke/{agent_type}. Формат событий тот же,
     что у /invoke/stream. Промежуточные события приходят для claims_agent
-    (pre_generation/post_generation) и general_questions_agent (answer).
+    (pre_generation/document_comment) и general_questions_agent (answer).
     """
     resolved = service.resolve_agent_type(agent_type)
     if resolved is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Неизвестный агент: {agent_type}. "
-                "Доступны: claims_agent, contract_agent, general_questions_agent, router_agent"
-            ),
+            detail=f"Неизвестный агент: {agent_type}. Доступны: {_AVAILABLE_AGENTS_HINT}",
         )
     logger.info(f"Stream-запрос на агент {resolved}, thread_id={request.thread_id}")
     events = service.process_with_agent_stream(resolved, request)
@@ -176,17 +179,14 @@ async def ainvoke_with_agent_type(
 ):
     """
     Прямой вызов указанного агента.
-    agent_type в path: claims_agent, contract_agent, general_questions_agent, router_agent.
+    agent_type в path: claims_agent, general_questions_agent, router_agent.
     request_metadata — параметры вызова (например document_type для claims_agent).
     """
     resolved = service.resolve_agent_type(agent_type)
     if resolved is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                f"Неизвестный агент: {agent_type}. "
-                "Доступны: claims_agent, contract_agent, general_questions_agent, router_agent"
-            ),
+            detail=f"Неизвестный агент: {agent_type}. Доступны: {_AVAILABLE_AGENTS_HINT}",
         )
     try:
         logger.info(f"Получен запрос на агент: {resolved}, thread_id={request.thread_id}")

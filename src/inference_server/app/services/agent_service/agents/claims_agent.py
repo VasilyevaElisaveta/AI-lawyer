@@ -10,7 +10,7 @@ def _shape_run_result(result: dict[str, Any]) -> dict[str, Any]:
     metadata["process_name"] = "claims_agent"
     return {
         "reply": result.get("reply", ""),
-        "final_reply_text": result.get("final_reply_text", ""),
+        "document_comment": result.get("document_comment", ""),
         "handled_by_agent": result.get("handled_by_agent", True),
         "document_created": result.get("document_created", False),
         "awaiting_input": result.get("awaiting_input", False),

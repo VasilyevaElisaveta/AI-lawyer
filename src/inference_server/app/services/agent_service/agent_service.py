@@ -196,8 +196,12 @@ class AgentService:
                 f"Маршрут: {route}, тип документа для claims: {document_type or '—'}"
             )
             if route == "contract_agent":
-                logger.info("Маршрутизация на contract_agent...")
-                result = await self.contract_agent.run(request.raw_input, request.thread_id)
+                # contract_agent отключён во внешнем API: обращаемся к general_questions_agent.
+                logger.info("Маршрут contract_agent → general_questions_agent")
+                result = await self.general_questions_agent.run(
+                    request.raw_input,
+                    request.thread_id,
+                )
             elif route == "claims_agent":
                 logger.info("Маршрутизация на claims_agent...")
                 result = await self.claims_agent.run(
@@ -255,7 +259,9 @@ class AgentService:
                     document_type=document_type,
                 )
             elif agent_type == "contract_agent":
-                result = await self.contract_agent.run(
+                # contract_agent отключён во внешнем API: обращаемся к general_questions_agent.
+                logger.info("Прямой вызов contract_agent → general_questions_agent")
+                result = await self.general_questions_agent.run(
                     request.raw_input,
                     request.thread_id,
                 )
@@ -329,7 +335,7 @@ class AgentService:
         metadata = metadata or result.get("metadata", {})
         return ChatResponse(
             reply=result.get("reply", ""),
-            final_reply_text=result.get("final_reply_text", ""),
+            document_comment=result.get("document_comment", ""),
             handled_by_agent=result.get("handled_by_agent", True),
             document_created=result.get("document_created", False),
             is_error=result.get("is_error", False),
@@ -490,13 +496,18 @@ class AgentService:
                     yield _shape_stream_event(event)
                 return
 
-            # Контракт-агент и router пока без стрима.
             if agent_type == "contract_agent":
-                result = await self.contract_agent.run(
+                # contract_agent отключён во внешнем API: стримим general_questions_agent.
+                logger.info("Stream contract_agent → general_questions_agent")
+                async for event in self.general_questions_agent.astream(
                     request.raw_input,
                     request.thread_id,
-                )
-            elif agent_type == "router_agent":
+                ):
+                    yield _shape_stream_event(event)
+                return
+
+            # router пока без стрима.
+            if agent_type == "router_agent":
                 result = self._format_router_direct_response(
                     await self.router_agent.run(
                         request.raw_input,
@@ -540,7 +551,7 @@ def _shape_stream_event(event: dict) -> dict:
         return {
             "type": "result",
             "reply": data.get("reply", ""),
-            "final_reply_text": data.get("final_reply_text", ""),
+            "document_comment": data.get("document_comment", ""),
             "handled_by_agent": data.get("handled_by_agent", True),
             "document_created": data.get("document_created", False),
             "is_error": bool(data.get("error")),

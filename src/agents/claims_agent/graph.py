@@ -22,7 +22,7 @@ from .nodes import (
     generator_node,
     qa_node,
     pre_generation_notify_node,
-    final_reply_node,
+    document_comment_node,
     evaluate_continue_task,
 )
 from .utils.docx_generator import (
@@ -134,10 +134,10 @@ class ClaimsAgent:
         ):
             return await pre_generation_notify_node(state, llm, config)
 
-        async def final_reply_wrapper(
+        async def document_comment_wrapper(
             state: ClaimsAgentState, config: RunnableConfig,
         ):
-            return await final_reply_node(state, llm, config)
+            return await document_comment_node(state, llm, config)
 
         builder = StateGraph(ClaimsAgentState)
 
@@ -151,7 +151,7 @@ class ClaimsAgent:
         builder.add_node("generator", generator_node_wrapper)
         builder.add_node("qa", qa_node_wrapper)
         builder.add_node("finalize", _finalize_node_wrapper)
-        builder.add_node("final_reply", final_reply_wrapper)
+        builder.add_node("document_comment", document_comment_wrapper)
 
         # Рёбра
         builder.set_entry_point("intake")
@@ -182,9 +182,9 @@ class ClaimsAgent:
         builder.add_conditional_edges(
             "finalize",
             self._route_after_finalize,
-            {"final_reply": "final_reply", END: END},
+            {"document_comment": "document_comment", END: END},
         )
-        builder.add_edge("final_reply", END)
+        builder.add_edge("document_comment", END)
 
         return builder.compile(checkpointer=self.memory)
 
@@ -204,9 +204,9 @@ class ClaimsAgent:
         return END
 
     def _route_after_finalize(self, state: ClaimsAgentState) -> str:
-        """После finalize: если документ сохранён — генерируем итоговое сообщение."""
+        """После finalize: если документ сохранён — генерируем сопроводительное сообщение."""
         if state.get("document_path"):
-            return "final_reply"
+            return "document_comment"
         return END
 
     def _route_after_qa(self, state: ClaimsAgentState) -> str:
@@ -390,7 +390,7 @@ class ClaimsAgent:
         Стриминговый вариант обработки.
 
         Прокидывает наружу события из custom-канала LangGraph
-        (pre_generation_notify_node / final_reply_node), а в конце —
+        (pre_generation_notify_node / document_comment_node), а в конце —
         итоговый result, собранный из финального state с metadata.
         """
         logger.info(f"[claims][stream] сообщение thread={thread_id}")
@@ -488,7 +488,7 @@ class ClaimsAgent:
             logger.debug(f"Got document path: {document_path}")
             return {
                 "reply": document_path,
-                "final_reply_text": state.get("final_reply_text") or "",
+                "document_comment": state.get("document_comment") or "",
                 "handled_by_agent": True,
                 "document_created": True,
                 "document_type": document_type,

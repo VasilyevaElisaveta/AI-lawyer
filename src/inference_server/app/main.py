@@ -34,7 +34,8 @@ async def lifespan(app: FastAPI):
     }
     llm_kwargs = {
         "credentials": os.getenv("SBER_AUTH"),
-        **DEFAULT_GIGACHAT_PARAMS
+        **DEFAULT_GIGACHAT_PARAMS,
+        "streaming": False,
     }
     app.state.llm_service = LLMService("GigaChat", llm_config, **llm_kwargs)
 

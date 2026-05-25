@@ -1,10 +1,13 @@
 """
-Промежуточные «статусные» узлы графа:
+Промежуточные узлы графа после валидации / генерации документа:
 
-- pre_generation_notify_node — после успешной валидации формирует короткое сообщение
-  «приступаю к генерации» с перечислением распознанных параметров.
-- final_reply_node — после сохранения DOCX формирует итоговое сообщение со списком
-  следующих шагов пользователя.
+- pre_generation_notify_node — после успешной валидации формирует короткое статусное
+  сообщение «приступаю к генерации» с перечислением распознанных параметров.
+  Стадия в стриме: "pre_generation".
+- document_comment_node — после сохранения DOCX формирует обычное сообщение
+  ассистента пользователю «документ готов, что дальше», к которому фронт прикладывает
+  созданный DOCX. Это полноценное сообщение, а не статус. Стадия в стриме:
+  "document_comment".
 
 Сообщения, помимо записи в state, дополнительно публикуются в custom-канал LangGraph
 через get_stream_writer(). В режиме graph.invoke writer — no-op, поэтому узлы
@@ -20,8 +23,8 @@ from langchain_core.runnables import RunnableConfig
 
 from ...state import ClaimsAgentState
 from ...prompts import (
-    FINAL_REPLY_HUMAN,
-    FINAL_REPLY_SYSTEM,
+    DOCUMENT_COMMENT_HUMAN,
+    DOCUMENT_COMMENT_SYSTEM,
     PRE_GENERATION_HUMAN,
     PRE_GENERATION_SYSTEM,
     render_template,
@@ -39,7 +42,7 @@ logger = LoggerFactory.get_logger(
 
 
 PRE_GENERATION_STAGE = "pre_generation"
-POST_GENERATION_STAGE = "post_generation"
+DOCUMENT_COMMENT_STAGE = "document_comment"
 
 
 def _document_label(document_type: str) -> str:
@@ -105,21 +108,26 @@ async def pre_generation_notify_node(
     }
 
 
-async def final_reply_node(
+async def document_comment_node(
     state: ClaimsAgentState,
     llm,
     config: RunnableConfig | None = None,
 ) -> dict[str, Any]:
-    """Итоговое LLM-сообщение пользователю после успешной генерации DOCX."""
+    """Итоговое сообщение ассистента после успешной генерации DOCX.
+
+    Это обычное сообщение для пользователя (а не системный статус):
+    оно появляется в чате как новый пузырь от ассистента, и фронт прикладывает
+    к нему сгенерированный DOCX (путь возвращается отдельным полем reply).
+    """
     document_type = state.get("document_type", "lawsuit")
-    logger.info("[claims][final_reply] формирование итогового сообщения (doc=%s)", document_type)
+    logger.info("[claims][document_comment] формирование сообщения (doc=%s)", document_type)
 
     history_text = messages_to_str(state.get("messages") or [])
     if len(history_text) > 4000:
         history_text = history_text[-4000:]
 
     prompt_text = render_template(
-        FINAL_REPLY_HUMAN,
+        DOCUMENT_COMMENT_HUMAN,
         {
             "document_type_label": _document_label(document_type),
             "plaintiff_info": state.get("plaintiff_info", "") or "—",
@@ -141,7 +149,7 @@ async def final_reply_node(
     try:
         response = await llm.ainvoke(
             [
-                SystemMessage(content=FINAL_REPLY_SYSTEM),
+                SystemMessage(content=DOCUMENT_COMMENT_SYSTEM),
                 HumanMessage(content=prompt_text),
             ],
             config=config,
@@ -152,16 +160,16 @@ async def final_reply_node(
             getattr(response, "usage_metadata", {}) or {},
         )
     except Exception as exc:
-        logger.warning(f"[claims][final_reply] ошибка LLM: {exc}")
+        logger.warning(f"[claims][document_comment] ошибка LLM: {exc}")
         text = (
             f"{_document_label(document_type).capitalize()} сформирован и сохранён. "
             "Проверьте реквизиты сторон и при необходимости вернитесь с уточнениями."
         )
 
-    emit_progress(POST_GENERATION_STAGE, text, document_type=document_type)
+    emit_progress(DOCUMENT_COMMENT_STAGE, text, document_type=document_type)
 
     return {
-        "final_reply_text": text,
+        "document_comment": text,
         "messages": [AIMessage(content=text)],
         "usage_metadata": usage_metadata,
     }

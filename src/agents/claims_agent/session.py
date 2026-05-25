@@ -55,7 +55,7 @@ _SESSION_FIELD_KEYS: tuple[str, ...] = (
     "pipeline_status",
     "error",
     "pre_generation_message",
-    "final_reply_text",
+    "document_comment",
     "usage_metadata",
 )
 

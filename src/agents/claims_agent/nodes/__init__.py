@@ -16,7 +16,7 @@ from .document_generation.calc import calculator_node
 from .document_generation.generator import generator_node
 from .document_generation.qa import qa_node
 from .document_generation.notify import (
-    final_reply_node,
+    document_comment_node,
     pre_generation_notify_node,
 )
 from .continue_task import evaluate_continue_task
@@ -31,6 +31,6 @@ __all__ = [
     "generator_node",
     "qa_node",
     "pre_generation_notify_node",
-    "final_reply_node",
+    "document_comment_node",
     "evaluate_continue_task",
 ]

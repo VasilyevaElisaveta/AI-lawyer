@@ -9,7 +9,7 @@
 Контракт события одинаковый для всех агентов:
     {
         "type":         "progress",
-        "stage":        "<stage-name>",  # e.g. pre_generation | post_generation | answer
+        "stage":        "<stage-name>",  # e.g. pre_generation | document_comment | answer
         "content":      "<текст>",
         "document_type": "lawsuit" | "complaint" | None,
     }

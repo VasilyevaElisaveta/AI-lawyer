@@ -106,7 +106,7 @@ class ClaimsAgentState(TypedDict, total=False):
 
     # ── Прогрессивные сообщения LLM (для UI / стриминга) ──────
     # Отдельный канал, чтобы не смешивать с обычным reply диалога.
-    pre_generation_message: str     # «приступаю к генерации …» — после успешной валидации
-    final_reply_text: str           # итоговое сообщение после генерации документа
+    pre_generation_message: str     # «приступаю к генерации …» — после успешной валидации (статус)
+    document_comment: str           # сообщение пользователю после генерации DOCX, к нему прикладывается документ
 
     usage_metadata: dict[str, Any]
