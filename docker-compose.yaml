@@ -41,8 +41,33 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - files:/backend/storage
-      - logs:/backend/logs
+      - files:${storage_path}
+      - logs:${logs_path}
+    networks:
+      - network
+
+  inference-server:
+    build:
+      context: ./src
+      dockerfile: ./Dockerfile
+      additional_contexts:
+        logger_lib: ./libs/logger
+    container_name: ai-lawyer-inference-server
+    restart: always
+    env_file:
+      - .env
+      - ./src/.env
+    ports:
+      - 8000:8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/chat/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - files:${GENERATED_DOCX_PATH}
+      - logs:${LOGS_DIR}
     networks:
       - network
 
