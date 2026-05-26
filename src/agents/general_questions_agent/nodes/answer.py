@@ -1,19 +1,56 @@
 import os
+import re
 from typing import Any, Dict
 
 from logger import LoggerFactory
 
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from ..state import GeneralQuestionAgentState
-from ..prompts import ANSWER_SYSTEM
+from ..prompts import ANSWER_SYSTEM, SELF_INTRO_REPLY
 
 from ...common.stream import emit_progress
 from ...utils import update_tokens_metadata
 
 
 ANSWER_STAGE = "answer"
+
+
+# Паттерны для перехвата вопросов «о себе».
+# GigaChat на стороне API подменяет ответ модели на собственный промо-текст
+# (рекламу сервисов Сбера), игнорируя наш SystemMessage. Поэтому такие вопросы
+# мы отлавливаем здесь и отвечаем готовым текстом из SELF_INTRO_REPLY без
+# обращения к LLM.
+_SELF_INTRO_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\bкто\s+ты\b"),
+    re.compile(r"\bчто\s+(ты|вы)\s+(умеешь|умеете)\b"),
+    re.compile(r"\bчто\s+(ты|вы)\s+(можешь|можете)\b"),
+    re.compile(r"\bна\s+что\s+(ты|вы)\s+способ"),
+    re.compile(r"\bрасскажи\s+(мне\s+)?(пожалуйста\s+)?о\s+себе\b"),
+    re.compile(r"\bрасскажи\s+(мне\s+)?(пожалуйста\s+)?(,\s*)?что\s+(ты|вы)\s+умеешь\b"),
+    re.compile(r"\bкакие\s+у\s+(тебя|вас)\s+(возможност|функци)"),
+    re.compile(r"\bопиши\s+(свои|твои)\s+(возможност|функци)"),
+    re.compile(r"\bпредставься\b"),
+    re.compile(r"\bкак\s+с\s+тобой\s+работать\b"),
+    re.compile(r"\bтвои\s+(возможност|функци)"),
+    re.compile(r"\bчем\s+(ты|вы)\s+(можешь|можете)\s+помочь\b"),
+)
+
+
+def _looks_like_self_intro_question(text: str) -> bool:
+    """Проверяет, является ли последний user-message вопросом «расскажи о себе»."""
+    if not text:
+        return False
+    normalized = re.sub(r"\s+", " ", text.lower()).strip()
+    return any(p.search(normalized) for p in _SELF_INTRO_PATTERNS)
+
+
+def _last_user_text(history: list[BaseMessage]) -> str:
+    for msg in reversed(history):
+        if isinstance(msg, HumanMessage):
+            return (msg.content or "").strip()
+    return ""
 
 logger = LoggerFactory.get_logger(
     name="GeneralQuestionsAgentAnswerNode",
@@ -73,6 +110,19 @@ async def answer_node(
     if not history:
         return {
             "error": "[general_questions_agent] empty input",
+        }
+
+    # Hot-path для вопросов «расскажи о себе / что ты умеешь / кто ты».
+    # GigaChat подменяет такие ответы на стороне API на свой заводской промо-текст,
+    # игнорируя SystemMessage. Поэтому отвечаем сами, без LLM.
+    last_user_text = _last_user_text(history)
+    if _looks_like_self_intro_question(last_user_text):
+        logger.info("Self-intro shortcut: skipping LLM, returning SELF_INTRO_REPLY")
+        emit_progress(ANSWER_STAGE, SELF_INTRO_REPLY)
+        return {
+            "reply": SELF_INTRO_REPLY,
+            "messages": [AIMessage(content=SELF_INTRO_REPLY)],
+            "usage_metadata": state.get("usage_metadata", {}) or {},
         }
 
     chat_messages = _build_chat_messages(history)

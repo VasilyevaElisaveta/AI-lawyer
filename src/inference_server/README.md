@@ -652,7 +652,7 @@ curl -X POST http://localhost:8000/api/chat/chat_name \
 
 ---
 
-## 17. Контракт «коротко на одном листе»
+## 16. Контракт «коротко на одном листе»
 
 ```text
 POST /api/chat/invoke                 → ChatResponse

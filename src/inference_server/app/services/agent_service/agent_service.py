@@ -115,7 +115,8 @@ class AgentService:
         }
         general_questions_kwargs = {
             "credentials": os.getenv("SBER_AUTH"),
-            **DEFAULT_GIGACHAT_PARAMS
+            **DEFAULT_GIGACHAT_PARAMS,
+            "max_tokens": 4096,
         }
 
         router_llm = create_gigachat("GigaChat", config=router_config, **router_kwargs)
