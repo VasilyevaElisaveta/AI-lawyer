@@ -7,7 +7,6 @@ from logger import LoggerFactory
 
 from langchain_core.tracers.context import collect_runs
 
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
 
@@ -32,6 +31,11 @@ from .utils.docx_generator import (
     save_docx_file,
 )
 
+from ..common.checkpointer import (
+    create_checkpointer,
+    graph_checkpoint_config,
+    setup_checkpointer,
+)
 from ..utils import resolve_run_usage, state_int
 
 
@@ -53,25 +57,25 @@ class ClaimsAgent:
 
     def __init__(self, llm):
         self.llm = llm
-        self.memory = MemorySaver()
-        # В проде заменить на RedisSaver или другое долговременное хранилище.
-        # from langgraph.checkpoint.redis import RedisSaver
-        # self.memory = RedisSaver.from_conn_string(
-        #     "redis://localhost:6379",
-        #     key_prefix=f"contract_agent:"
-        # )
+        self.memory = create_checkpointer("claims")
         self.graph = self._build_graph(llm)
         logger.info("ClaimsAgent initialized")
 
+    async def initialize_checkpointer(self) -> None:
+        await setup_checkpointer(self.memory)
+
+    def _checkpoint_config(self, thread_id: str) -> dict[str, Any]:
+        return graph_checkpoint_config("claims", thread_id)
+
     async def get_current_agent(self, thread_id: str) -> str | None:
-        config = {"configurable": {"thread_id": thread_id}}
+        config = self._checkpoint_config(thread_id)
         snapshot = await self.graph.aget_state(config)
         if not snapshot or not snapshot.values:
             return None
         return snapshot.values.get("current_agent")
 
     async def check_continue_task(self, raw_input: str, thread_id: str) -> bool:
-        config = {"configurable": {"thread_id": thread_id}}
+        config = self._checkpoint_config(thread_id)
         snapshot = await self.graph.aget_state(config)
         session_state = snapshot.values if snapshot else {}
         result = await evaluate_continue_task(
@@ -92,7 +96,7 @@ class ClaimsAgent:
             )
 
     async def clear_session(self, thread_id: str) -> None:
-        config = {"configurable": {"thread_id": thread_id}}
+        config = self._checkpoint_config(thread_id)
         snapshot = await self.graph.aget_state(config)
         if snapshot and snapshot.values:
             await self.graph.aupdate_state(
@@ -322,7 +326,7 @@ class ClaimsAgent:
             initial_state["validation_attempts"] = 0
             initial_state["validation_errors"] = []
             initial_state["qa_attempts"] = 0
-            config = {"configurable": {"thread_id": thread_id}}
+            config = self._checkpoint_config(thread_id)
             await self._reset_usage_counters(config)
             snapshot = await self.graph.aget_state(config)
             prev = snapshot.values if snapshot else {}
@@ -409,7 +413,7 @@ class ClaimsAgent:
             initial_state["validation_attempts"] = 0
             initial_state["validation_errors"] = []
             initial_state["qa_attempts"] = 0
-            config = {"configurable": {"thread_id": thread_id}}
+            config = self._checkpoint_config(thread_id)
 
             await self._reset_usage_counters(config)
             snapshot = await self.graph.aget_state(config)

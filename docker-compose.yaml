@@ -4,6 +4,7 @@ networks:
 
 volumes:
   db-storage:
+  redis-data:
   files:
   logs:
 
@@ -46,6 +47,19 @@ services:
     networks:
       - network
 
+  redis:
+    image: redis/redis-stack-server:7.4.0-v1
+    restart: always
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - network
+
   inference-server:
     build:
       context: ./src
@@ -59,6 +73,9 @@ services:
       - ./src/.env
     ports:
       - 8000:8000
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/chat/health"]
       interval: 30s

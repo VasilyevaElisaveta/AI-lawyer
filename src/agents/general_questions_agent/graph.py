@@ -2,7 +2,6 @@ import os
 from typing import Any, AsyncIterator
 
 from langgraph.graph import END, START, StateGraph
-from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tracers.context import collect_runs
 
@@ -12,6 +11,12 @@ from memory import memory_node
 
 from .nodes import answer_node, clear_previous_run_results, clear_before_end
 from .state import GeneralQuestionAgentState
+
+from ..common.checkpointer import (
+    create_checkpointer,
+    graph_checkpoint_config,
+    setup_checkpointer,
+)
 
 
 logger = LoggerFactory.get_logger(
@@ -63,15 +68,11 @@ def create_graph(llm) -> StateGraph:
 class GeneralQuestionsAgent:
     def __init__(self, llm) -> None:
         self.llm = llm
-        # Временное решение для сохранения состояния между вызовами.
-        self.memory = MemorySaver()
-        # В проде заменить на RedisSaver или другое долговременное хранилище.
-        # from langgraph.checkpoint.redis import RedisSaver
-        # self.memory = RedisSaver.from_conn_string(
-        #     "redis://localhost:6379",
-        #     key_prefix=f"contract_agent:"
-        # )
+        self.memory = create_checkpointer("general_questions")
         self.graph = create_graph(self.llm).compile(checkpointer=self.memory)
+
+    async def initialize_checkpointer(self) -> None:
+        await setup_checkpointer(self.memory)
 
     def _build_input_state(self, user_message: str) -> dict:
         return {
@@ -79,10 +80,9 @@ class GeneralQuestionsAgent:
         }
 
     def _config(self, thread_id: str) -> dict[str, Any]:
-        return {
-            "run_name": "GeneralQuestionAgent",
-            "configurable": {"thread_id": thread_id},
-        }
+        cfg = graph_checkpoint_config("general_questions", thread_id)
+        cfg["run_name"] = "GeneralQuestionAgent"
+        return cfg
 
     @staticmethod
     def _build_metadata(traced_runs, usage: dict[str, Any]) -> dict[str, Any]:

@@ -1,4 +1,17 @@
 services:
+  redis:
+    image: redis/redis-stack-server:7.4.0-v1
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-lawyer-network
+
   inference-server:
     env_file:
       - .env
@@ -10,6 +23,9 @@ services:
     container_name: ai-lawyer-inference-server
     ports:
       - 8000:8000
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/chat/health"]
       interval: 30s

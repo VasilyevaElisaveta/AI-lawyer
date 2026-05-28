@@ -3,6 +3,7 @@ from typing import AsyncIterator
 
 from logger import LoggerFactory
 
+from agents.common.checkpointer import is_debug_mode
 from agents.llm_client import create_gigachat, DEFAULT_GIGACHAT_PARAMS
 
 from .agents.contract_agent import ContractGraphAgent
@@ -130,6 +131,15 @@ class AgentService:
         self.claims_agent = ClaimsGraphAgent(claims_llm)
         self.general_questions_agent = GeneralQuestionsGraphAgent(general_questions_llm)
         logger.info("AgentService инициализирован успешно")
+
+    async def initialize(self) -> None:
+        """Инициализирует Redis Stack индексы (no-op при MODE=DEBUG)."""
+        if is_debug_mode():
+            logger.info("Checkpointer: MemorySaver (MODE=DEBUG)")
+            return
+        logger.info("Инициализация Redis checkpointer (общий AsyncRedisSaver, db=0)...")
+        await self.claims_agent.agent.initialize_checkpointer()
+        logger.info("Checkpointer готов")
 
     _AGENT_ALIASES: dict[str, str] = {
         "claims": "claims_agent",

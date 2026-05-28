@@ -1,13 +1,19 @@
 from typing import Any
 
 from langgraph.graph import END, START, StateGraph
-from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 
 from memory import memory_node
 
 from .nodes import *
 from .state import ContractAgentState
+
+from ..common.checkpointer import (
+    create_checkpointer,
+    graph_checkpoint_config,
+    setup_checkpointer,
+)
+
 
 def create_graph(llm, generator_llm=None) -> StateGraph:
     """Создаёт граф агента."""
@@ -105,18 +111,14 @@ class ContractAgent:
     def __init__(self, llm, generator_llm=None) -> None:
         self.llm = llm
         self.generator_llm = generator_llm
-        # Временное решение для сохранения состояния между вызовами.
-        self.memory = MemorySaver()
-        # В проде заменить на RedisSaver или другое долговременное хранилище.
-        # from langgraph.checkpoint.redis import RedisSaver
-        # self.memory = RedisSaver.from_conn_string(
-        #     "redis://localhost:6379",
-        #     key_prefix=f"contract_agent:"
-        # )
+        self.memory = create_checkpointer("contract")
         self.graph = create_graph(
             self.llm, 
             generator_llm=generator_llm
         ).compile(checkpointer=self.memory)
+
+    async def initialize_checkpointer(self) -> None:
+        await setup_checkpointer(self.memory)
 
     def _build_input_state(self, user_message: str) -> dict:
         return {
@@ -125,14 +127,11 @@ class ContractAgent:
 
     async def process_user_message(self, user_message: str, thread_id: str) -> dict[str, Any]:
         input_state = self._build_input_state(user_message)
+        config = graph_checkpoint_config("contract", thread_id)
+        config["run_name"] = "ContractAgent"
         result = await self.graph.ainvoke(
             input_state,
-            config={
-                "run_name": "ContractAgent",
-                "configurable": {
-                    "thread_id": thread_id
-                }
-            }
+            config=config,
         )
         if result.get("response_to_user"):
             result["reply"] = result["response_to_user"]

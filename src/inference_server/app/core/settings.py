@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Приложение
     APP_NAME: str = "AI Lawyer Inference Server"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = True
+    MODE: str = "DEBUG"
     
     # LLM
     LLM_MODEL: str = "GigaChat"

@@ -4,13 +4,17 @@ from typing import Any
 from logger import LoggerFactory
 
 from langgraph.graph import END, START, StateGraph
-from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tracers.context import collect_runs
 
 from .nodes import classification_node, clear_previous_run_results, clear_before_end
 from .state import RouterAgentState
 
+from ..common.checkpointer import (
+    create_checkpointer,
+    graph_checkpoint_config,
+    setup_checkpointer,
+)
 from ..utils import resolve_run_usage
 
 
@@ -60,8 +64,11 @@ def create_graph(llm) -> StateGraph:
 class RouterAgent:
     def __init__(self, llm) -> None:
         self.llm = llm
-        self.memory = MemorySaver()
+        self.memory = create_checkpointer("router")
         self.graph = create_graph(self.llm).compile(checkpointer=self.memory)
+
+    async def initialize_checkpointer(self) -> None:
+        await setup_checkpointer(self.memory)
 
     def _build_input_state(self, raw_input: str) -> dict:
         return {
@@ -70,15 +77,12 @@ class RouterAgent:
 
     async def process_user_message(self, raw_input: str, thread_id: str) -> dict:
         input_state = self._build_input_state(raw_input)
+        config = graph_checkpoint_config("router", thread_id)
+        config["run_name"] = "RouterAgent"
         with collect_runs() as runs_cb:
             response = await self.graph.ainvoke(
                 input_state,
-                config={
-                    "run_name": "RouterAgent",
-                    "configurable": {
-                        "thread_id": thread_id
-                    }
-                }
+                config=config,
             )
         root_run = runs_cb.traced_runs[-1]
         logger.debug(f"RESPONSE: {response}")

@@ -23,8 +23,16 @@ logger = LoggerFactory.get_logger(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info(f"=== {settings.APP_NAME} v{settings.APP_VERSION} запущен ===")
-    logger.info(f"Debug mode: {settings.DEBUG}")
-    app.state.agent_service = AgentService()
+    from agents.common.checkpointer import is_debug_mode
+
+    logger.info(
+        "MODE=%s (checkpointer: %s)",
+        settings.MODE,
+        "MemorySaver" if is_debug_mode() else "Redis",
+    )
+    agent_service = AgentService()
+    await agent_service.initialize()
+    app.state.agent_service = agent_service
 
     llm_config={
         "metadata": {
@@ -49,7 +57,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
-        debug=settings.DEBUG,
+        debug=settings.MODE.strip().upper() == "DEBUG",
         lifespan=lifespan,
     )
 
