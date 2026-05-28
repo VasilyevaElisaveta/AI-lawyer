@@ -23,29 +23,10 @@ def is_debug_mode() -> bool:
     return (os.getenv("MODE") or "DEBUG").strip().upper() == "DEBUG"
 
 
-def _running_in_docker() -> bool:
-    return os.path.exists("/.dockerenv")
-
-
-def _is_local_redis_host(url: str) -> bool:
-    return bool(re.search(r"redis://(localhost|127\.0\.0\.1)(:|/|$)", url))
-
-
-def _replace_redis_host(url: str, host: str) -> str:
-    return re.sub(r"redis://(localhost|127\.0\.0\.1)", f"redis://{host}", url, count=1)
-
-
 @lru_cache(maxsize=1)
 def _redis_url() -> str:
     """RediSearch-индексы LangGraph работают только на database 0."""
     url = (os.getenv("REDIS_URL") or "redis://localhost:6379").strip()
-    if _running_in_docker() and _is_local_redis_host(url):
-        url = _replace_redis_host(url, "redis")
-        logger.warning(
-            "REDIS_URL указывал на localhost внутри контейнера — "
-            "используем хост redis (%s)",
-            url,
-        )
     base = re.sub(r"/\d+$", "", url.rstrip("/"))
     return f"{base}/0"
 
