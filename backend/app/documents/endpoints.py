@@ -28,7 +28,7 @@ async def get_documents(user: CurrentUser, db: AppDatabase):
                       response_class=FileResponse,
                       status_code=status.HTTP_200_OK)
 async def get_document(document_id: int, user: CurrentUser, db: AppDatabase):
-    document = await db.exec_query(Queries.get_document(document_id))
+    document = await db.exec_query(Queries.get_document_query(document_id))
     if document is None or document.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found.")
     

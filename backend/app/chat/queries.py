@@ -96,6 +96,11 @@ class Queries:
     def add_rating_to_message_query(message_id: int, rating: int):
         query = update(Message).filter_by(id=message_id).values(rating=rating).returning(Message.rating)
         return query
+    
+    @staticmethod
+    def rename_chat_query(chat_id: UUID, new_name: str):
+        query = update(Chat).filter_by(id=chat_id).values(name=new_name).returning(Chat.name.label("new_name"))
+        return query
 
     @staticmethod
     def delete_chat_query(chat_id: UUID):

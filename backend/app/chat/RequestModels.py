@@ -55,3 +55,8 @@ class OneMessageResponseModel(BaseModel):
 class RatingModel(BaseModel):
 
     rating: int = Field(ge=MIN_MESSAGE_RATING, le=MAX_MESSAGE_RATING)
+
+
+class RenameChatModel(BaseModel):
+
+    new_name: str
