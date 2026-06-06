@@ -108,66 +108,124 @@ def _extract_short_name(full_info: str, max_length: int = 80) -> str:
     return name
 
 
+_MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
+_INLINE_MD_RE = re.compile(r"(\*\*.+?\*\*|\*.+?\*)")
+
+
+def _parse_line(raw_line: str) -> tuple[str, bool]:
+    """Снимает префикс markdown-заголовка (# …). Возвращает (текст, был_заголовок)."""
+    stripped = raw_line.strip()
+    match = _MD_HEADING_RE.match(stripped)
+    if match:
+        return match.group(2).strip(), True
+    return stripped, False
+
+
+def _is_document_title(text: str) -> bool:
+    upper = text.upper()
+    return (
+        "ИСКОВОЕ ЗАЯВЛЕНИЕ" in upper
+        or "ДОСУДЕБНАЯ ПРЕТЕНЗИЯ" in upper
+        or upper.startswith("ПРЕТЕНЗИ")
+    )
+
+
+def _is_section_heading(text: str, was_md_heading: bool) -> bool:
+    if was_md_heading:
+        return True
+    if len(text) < 4 or len(text) > 120:
+        return False
+    letters = [c for c in text if c.isalpha()]
+    if not letters:
+        return False
+    upper_count = sum(1 for c in letters if c.isupper() or c == "Ё")
+    return upper_count / len(letters) >= 0.85
+
+
+def _is_numbered_heading(text: str) -> bool:
+    return bool(text) and text[0].isdigit() and "." in text[:5]
+
+
+def _add_inline_runs(
+    paragraph,
+    text: str,
+    *,
+    bold: bool = False,
+    size: Pt = Pt(14),
+) -> None:
+    """Разбирает **жирный** и *курсив* в runs python-docx."""
+    for part in _INLINE_MD_RE.split(text):
+        if not part:
+            continue
+        run_bold = bold
+        run_italic = False
+        content = part
+        if part.startswith("**") and part.endswith("**") and len(part) > 4:
+            content = part[2:-2]
+            run_bold = True
+        elif (
+            part.startswith("*")
+            and part.endswith("*")
+            and len(part) > 2
+            and not part.startswith("**")
+        ):
+            content = part[1:-1]
+            run_italic = True
+        run = paragraph.add_run(content)
+        run.font.name = "Times New Roman"
+        run.font.size = size
+        if run_bold:
+            run.bold = True
+        if run_italic:
+            run.italic = True
+
+
 def _add_formatted_content(doc: Document, text: str) -> None:
     """
     Добавляет текст в документ с форматированием.
 
     Правила:
-    - Шапка (первые строки до заголовка) → выравнивание справа, Times New Roman 12pt
-    - Заголовок "ИСКОВОЕ ЗАЯВЛЕНИЕ" → по центру, жирный, 14pt
+    - Реквизиты (строки до заголовка) → справа, Times New Roman 12pt
+    - Заголовок «ИСКОВОЕ ЗАЯВЛЕНИЕ» → по центру, жирный, 14pt
     - Основной текст → Times New Roman 14pt, междустрочный интервал 1.5
-    - Подзаголовки (начинаются с цифры + точка) → жирный
     """
-    lines = text.split('\n')
-
+    lines = text.split("\n")
     in_header = True
 
     for line in lines:
-        line_stripped = line.strip()
+        line_stripped, was_md_heading = _parse_line(line)
 
-        # Пропускаем пустые строки
         if not line_stripped:
             doc.add_paragraph()
             continue
 
-        # Определение типа строки
-        if "ИСКОВОЕ ЗАЯВЛЕНИЕ" in line_stripped.upper():
-            # Заголовок
-            p = doc.add_paragraph(line_stripped)
+        if _is_document_title(line_stripped):
+            p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.runs[0]
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(14)
-            run.font.bold = True
+            _add_inline_runs(p, line_stripped, bold=True, size=Pt(14))
             in_header = False
             continue
 
         if in_header:
-            # Шапка документа (до заголовка) — справа
-            p = doc.add_paragraph(line_stripped)
+            p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            run = p.runs[0]
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
+            _add_inline_runs(p, line_stripped, size=Pt(12))
             continue
 
-        # Подзаголовки (начинаются с "1.", "2." и т.д.)
-        if line_stripped and line_stripped[0].isdigit() and '.' in line_stripped[:5]:
-            p = doc.add_paragraph(line_stripped)
-            run = p.runs[0]
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(14)
-            run.font.bold = True
-            p.paragraph_format.space_before = Pt(6)
+        if _is_section_heading(line_stripped, was_md_heading):
+            p = doc.add_paragraph()
+            _add_inline_runs(p, line_stripped, bold=True, size=Pt(14))
             continue
 
-        # Обычный текст
-        p = doc.add_paragraph(line_stripped)
-        run = p.runs[0]
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(14)
+        if _is_numbered_heading(line_stripped):
+            p = doc.add_paragraph()
+            _add_inline_runs(p, line_stripped, bold=True, size=Pt(14))
+            continue
+
+        p = doc.add_paragraph()
+        _add_inline_runs(p, line_stripped, size=Pt(14))
         p.paragraph_format.line_spacing = 1.5
-        p.paragraph_format.first_line_indent = Inches(0.5)  # Абзацный отступ
+        p.paragraph_format.first_line_indent = Inches(0.5)
 
 
 def save_docx_file(docx_bytes: bytes, path: str) -> None:
