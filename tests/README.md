@@ -2,7 +2,9 @@
 
 Офлайн-проверка ключевых узлов ассистента на эталонных кейсах (107 примеров). Прогон: `make_dataset.py` → `run_test.py` → `make_metrics.py` (детали — в `metrics.json` каждого модуля).
 
-Зависимости: `pip install -r tests/requirements.txt`, для LLM-тестов — `src/.env`.
+Зависимости: `pip install -r tests/requirements.txt`, конфиг — `tests/.env` (из `tests/.env.example`).
+
+**Smoke-тесты API** (отдельно от офлайн-метрик): папка `tests/api_smoke/`. Конфиг — `tests/.env`, запуск — `python tests/api_smoke/run.py`, лог — `tests/api_smoke/logs.txt` (пишется по ходу прогона).
 
 ---
 
