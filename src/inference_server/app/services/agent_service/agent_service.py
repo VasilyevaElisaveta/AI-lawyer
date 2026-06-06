@@ -63,7 +63,7 @@ class AgentService:
         router_config={
             "metadata": {
                 "ls_provider": "gigachat",
-                "ls_model_name": "GigaChat",
+                "ls_model_name": os.getenv("LLM_MODEL", "GigaChat"),
             }
         }
         router_kwargs = {
@@ -73,7 +73,7 @@ class AgentService:
         contract_config={
             "metadata": {
                 "ls_provider": "gigachat",
-                "ls_model_name": "GigaChat",
+                "ls_model_name": os.getenv("LLM_MODEL", "GigaChat"),
             }
         }
         contract_kwargs = {
@@ -83,7 +83,7 @@ class AgentService:
         contract_generator_config={
             "metadata": {
                 "ls_provider": "gigachat",
-                "ls_model_name": "GigaChat",
+                "ls_model_name": os.getenv("LLM_MODEL", "GigaChat"),
             }
         }
         contract_generator_kwargs = {
@@ -94,7 +94,7 @@ class AgentService:
         claims_config={
             "metadata": {
                 "ls_provider": "gigachat",
-                "ls_model_name": "GigaChat",
+                "ls_model_name": os.getenv("LLM_MODEL", "GigaChat"),
             }
         }
         claims_kwargs = {
@@ -111,7 +111,7 @@ class AgentService:
         general_questions_config={
             "metadata": {
                 "ls_provider": "gigachat",
-                "ls_model_name": "GigaChat",
+                "ls_model_name": os.getenv("LLM_MODEL", "GigaChat"),
             }
         }
         general_questions_kwargs = {
@@ -120,11 +120,11 @@ class AgentService:
             "max_tokens": 4096,
         }
 
-        router_llm = create_gigachat("GigaChat", config=router_config, **router_kwargs)
-        contract_llm = create_gigachat("GigaChat", config=contract_config, **contract_kwargs)
-        contract_generator_llm = create_gigachat("GigaChat", config=contract_generator_config, **contract_generator_kwargs)
-        claims_llm = create_gigachat("GigaChat", config=claims_config, **claims_kwargs)
-        general_questions_llm = create_gigachat("GigaChat", config=general_questions_config, **general_questions_kwargs)
+        router_llm = create_gigachat(os.getenv("LLM_MODEL", "GigaChat"), config=router_config, **router_kwargs)
+        contract_llm = create_gigachat(os.getenv("LLM_MODEL", "GigaChat"), config=contract_config, **contract_kwargs)
+        contract_generator_llm = create_gigachat(os.getenv("LLM_MODEL", "GigaChat"), config=contract_generator_config, **contract_generator_kwargs)
+        claims_llm = create_gigachat(os.getenv("LLM_MODEL", "GigaChat"), config=claims_config, **claims_kwargs)
+        general_questions_llm = create_gigachat(os.getenv("LLM_MODEL", "GigaChat"), config=general_questions_config, **general_questions_kwargs)
 
         self.router_agent = RouterGraphAgent(router_llm)
         self.contract_agent = ContractGraphAgent(contract_llm, generator_llm=contract_generator_llm)
