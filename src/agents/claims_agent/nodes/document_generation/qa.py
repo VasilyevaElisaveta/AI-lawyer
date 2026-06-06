@@ -23,7 +23,7 @@ from ...prompts import (
     render_template,
 )
 
-from ....utils import state_int
+from ....utils import state_int, update_tokens_metadata
 
 
 
@@ -97,7 +97,7 @@ def _qa_lawsuit(
         },
     )
 
-    return _run_qa(QA_SYSTEM, prompt, qa_attempts, "lawsuit", llm, config)
+    return _run_qa(QA_SYSTEM, prompt, qa_attempts, "lawsuit", llm, config, state)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -136,7 +136,7 @@ def _qa_complaint(
         },
     )
 
-    return _run_qa(COMPLAINT_QA_SYSTEM, prompt, qa_attempts, "complaint", llm, config)
+    return _run_qa(COMPLAINT_QA_SYSTEM, prompt, qa_attempts, "complaint", llm, config, state)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -149,7 +149,8 @@ def _run_qa(
     qa_attempts: int,
     doc_type: str,
     llm,
-    config: RunnableConfig
+    config: RunnableConfig,
+    state: ClaimsAgentState,
 ) -> dict[str, Any]:
     try:
         response = llm.invoke(
@@ -170,6 +171,12 @@ def _run_qa(
             feedback_parts.append("Предложения:\n" + "\n".join(f"• {s}" for s in result["suggestions"]))
         feedback = "\n\n".join(feedback_parts) if feedback_parts else ""
 
+        usage_metadata = update_tokens_metadata(
+            state.get("usage_metadata", {}) or {},
+            getattr(response, "usage_metadata", {}) or {},
+            ["input_tokens", "output_tokens", "total_tokens"],
+        )
+
         logger.info(
             "  QA attempt %d (%s): %s  score=%s",
             qa_attempts,
@@ -182,6 +189,7 @@ def _run_qa(
             "qa_passed": passed,
             "qa_feedback": feedback,
             "qa_attempts": qa_attempts,
+            "usage_metadata": usage_metadata,
         }
 
     except Exception as e:

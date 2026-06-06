@@ -18,6 +18,8 @@ from ...prompts import (
     render_template
 )
 
+from ....utils import update_tokens_metadata
+
 
 logger = LoggerFactory.get_logger(
     name=__name__,
@@ -62,8 +64,13 @@ def research_node(
         )
         content = response.content
         data = _parse_research(content)
+        usage_metadata = update_tokens_metadata(
+            state.get("usage_metadata", {}) or {},
+            getattr(response, "usage_metadata", {}) or {},
+            ["input_tokens", "output_tokens", "total_tokens"],
+        )
         logger.info("  Research completed, laws length: %d chars", len(data.get("applicable_laws", "")))
-        return data
+        return {**data, "usage_metadata": usage_metadata}
 
     except Exception as e:
         logger.error("Research failed: %s", e)

@@ -42,6 +42,10 @@ async def clear_previous_run_results(state: Dict[str, Any]) -> Dict[str, Any]:
         "routed_to": None,
         "is_implemented": None,
         "usage_metadata": {},
+        "category": None,
+        "document_type": None,
+        "classification_confidence": None,
+        "classification_result": None,
     }
 
 
@@ -88,7 +92,7 @@ async def classification_node(
             ["input_tokens", "output_tokens", "total_tokens"]
         )
     except Exception as e:
-        logger.error(f"Got error {e}")
+        logger.error("Got error %s", e)
         return {
             "error": "[router_agent] ainvoke error",
         }

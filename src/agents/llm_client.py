@@ -1,11 +1,7 @@
 import inspect
-import os
-from dotenv import load_dotenv
 
 from langchain_gigachat import GigaChat
 
-
-load_dotenv()
 
 DEFAULT_GIGACHAT_PARAMS = {
     "profanity_check": False,
@@ -19,12 +15,23 @@ DEFAULT_GIGACHAT_PARAMS = {
 
 def create_gigachat(
     model: str,
+    *,
+    credentials: str,
+    scope: str = "GIGACHAT_API_PERS",
     temperature: float | None = None,
     config=None,
     **kwargs,
 ) -> GigaChat:
+    """
+    Фабрика GigaChat.
+
+    credentials — ключ авторизации из личного кабинета GigaChat (SBER_AUTH).
+    scope — версия API, привязанная к типу ключа (GIGACHAT_API_PERS / _B2B / _CORP).
+    """
     params = {
-        "model": model or os.getenv("LLM_MODEL", "GigaChat"),
+        "model": model,
+        "credentials": credentials,
+        "scope": scope,
         **kwargs,
     }
 

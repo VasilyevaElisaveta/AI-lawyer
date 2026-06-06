@@ -207,22 +207,30 @@ def merge_usage_dicts(*parts: dict[str, Any]) -> dict[str, int]:
 def usage_from_traced_runs(traced_runs) -> dict[str, int]:
     if not traced_runs:
         return normalize_usage_dict(None)
-    root = traced_runs[-1]
-    usage = normalize_usage_dict(getattr(root, "usage_metadata", None) or {})
-    if usage["total_tokens"] > 0 or usage["input_tokens"] > 0:
-        return usage
-    return aggregate_traced_runs_usage(traced_runs)
+    root_usage = normalize_usage_dict(getattr(traced_runs[-1], "usage_metadata", None) or {})
+    aggregated = aggregate_traced_runs_usage(traced_runs)
+    if aggregated["total_tokens"] > root_usage["total_tokens"]:
+        return aggregated
+    if root_usage["total_tokens"] > 0 or root_usage["input_tokens"] > 0:
+        return root_usage
+    return aggregated
 
 
 def resolve_run_usage(
     state_usage: dict[str, Any] | None,
     traced_runs,
 ) -> dict[str, int]:
-    """Токены текущего HTTP-запроса: state (GigaChat) с fallback на tracer."""
-    usage = normalize_usage_dict(state_usage)
-    if usage["total_tokens"] > 0 or usage["input_tokens"] > 0:
-        return usage
-    return usage_from_traced_runs(traced_runs)
+    """
+    Токены текущего HTTP-запроса.
+
+    В state накапливается usage только в части узлов; LangSmith/tracer видит все LLM-вызовы.
+    Берём больший из двух источников, чтобы не занижать total относительно trace.
+    """
+    state_norm = normalize_usage_dict(state_usage)
+    traced_norm = usage_from_traced_runs(traced_runs)
+    if traced_norm["total_tokens"] >= state_norm["total_tokens"]:
+        return traced_norm
+    return state_norm
 
 
 def state_float(state: dict, key: str, default: float = 0.0) -> float:

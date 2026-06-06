@@ -24,7 +24,7 @@ from ...prompts import (
     render_template,
 )
 
-from ....utils import extract_llm_json, state_float
+from ....utils import extract_llm_json, state_float, update_tokens_metadata
 
 
 logger = LoggerFactory.get_logger(
@@ -155,6 +155,12 @@ def classification_node(
         content = response.content
         result = _parse_and_validate_classification(content, state)
 
+        usage_metadata = update_tokens_metadata(
+            state.get("usage_metadata", {}) or {},
+            getattr(response, "usage_metadata", {}) or {},
+            ["input_tokens", "output_tokens", "total_tokens"],
+        )
+
         logger.info(
             "[claims][case analysis] результат: тип=%s категория=%s подсудность=%s имущественный=%s",
             result.case_type,
@@ -176,6 +182,7 @@ def classification_node(
             "case_type": result.case_type,
             "case_category": result.case_category,
             "is_property_dispute": result.claim_nature in ["property", "mixed"],
+            "usage_metadata": usage_metadata,
         }
 
     except Exception as e:

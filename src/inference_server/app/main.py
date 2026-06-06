@@ -41,11 +41,16 @@ async def lifespan(app: FastAPI):
         }
     }
     llm_kwargs = {
-        "credentials": os.getenv("SBER_AUTH"),
+        "credentials": os.getenv("SBER_AUTH", ""),
+        "scope": os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS"),
         **DEFAULT_GIGACHAT_PARAMS,
         "streaming": False,
     }
-    app.state.llm_service = LLMService("GigaChat", llm_config, **llm_kwargs)
+    app.state.llm_service = LLMService(
+        os.getenv("LLM_MODEL", "GigaChat"),
+        llm_config,
+        **llm_kwargs,
+    )
 
     try:
         yield

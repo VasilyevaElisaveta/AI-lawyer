@@ -646,6 +646,7 @@ curl -X POST http://localhost:8000/api/chat/chat_name \
 | `LOGS_DIR`            | `/logs`               | Куда инференс пишет логи. Бэку обычно не нужно.                                                                                                         |
 | `MODE`                | `DEBUG`               | Если `DEBUG` — логи только в stdout. Иначе — также в `LOGS_FILE` внутри `LOGS_DIR`.                                                                     |
 | `SBER_AUTH`           | —                     | Авторизация GigaChat. На стороне инференса.                                                                                                             |
+| `GIGACHAT_SCOPE`      | `GIGACHAT_API_PERS`   | Версия API: `GIGACHAT_API_PERS`, `GIGACHAT_API_B2B` или `GIGACHAT_API_CORP` — должна совпадать с типом ключа в кабинете Сбера.                        |
 
 
 Подробнее см. `.env.example` в корне репозитория.
