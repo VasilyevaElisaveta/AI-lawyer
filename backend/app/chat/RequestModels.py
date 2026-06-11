@@ -1,8 +1,20 @@
 from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime
+from enum import StrEnum
 
 from db.DatabaseModels import MAX_MESSAGE_RATING, MIN_MESSAGE_RATING
+
+
+class AgentType(StrEnum):
+    CLAIMS_AGENT = "claims_agent"
+    CLAIM = "claim"
+    CLAIMS = "claims"
+    GENERAL_QUESTIONS_AGENT = "general_questions_agent"
+    GENERAL_QUESTIONS = "general_questions"
+    GENERAL = "general"
+    ROUTER_AGENT = "router_agent"
+    ROUTER = "router"
 
 
 class CreateChatResponseModel(BaseModel):
@@ -45,6 +57,7 @@ class AllMessagesResponseModel(BaseModel):
 class OneMessageRequestModel(BaseModel):
 
     message: str
+    agent_type: AgentType | None = None
 
 
 class OneMessageResponseModel(BaseModel):

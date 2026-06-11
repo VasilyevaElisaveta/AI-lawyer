@@ -10,7 +10,7 @@ class Queries:
         query = (
             insert(User)
             .values(username=username, email=email, password=hashed_password, name=name, surname=surname, patronymic=patronymic, is_admin=is_admin)
-            .returning(User.id, User.name, User.surname, User.patronymic, User.username, User.email)
+            .returning(User.id, User.name, User.surname, User.patronymic, User.username, User.email, User.is_admin)
         )
         return query
 
@@ -28,7 +28,7 @@ class Queries:
         query = (update(User)
                  .filter_by(id=user_id)
                  .values(**new_user_data)
-                 .returning(User.name, User.surname, User.patronymic, User.username, User.email))
+                 .returning(User.name, User.surname, User.patronymic, User.username, User.email, User.is_admin))
         return query
     
     @staticmethod

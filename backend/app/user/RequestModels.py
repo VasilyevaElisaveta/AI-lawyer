@@ -67,6 +67,7 @@ class UserResponseModel(BaseModel):
     patronymic: str | None
     username: str
     email: str
+    is_admin: bool
 
 
 class RefreshTokensRequestModel(BaseModel):

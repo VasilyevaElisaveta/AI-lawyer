@@ -103,11 +103,15 @@ async def send_message(chat_id: UUID, data: Annotated[OneMessageRequestModel, Fo
     if current_chat is None or user.id != current_chat.user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
     
+    if data.agent_type is not None and not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the administrator can manually select the agent type")
+    
     human_message = await db.exec_query(Queries.add_message_to_chat_query(chat_id, data.message, "human"))
 
+    inference_server_url = f"{INFERENCE_URL}/api/chat/invoke" + (f"/{data.agent_type}" if data.agent_type is not None else "")
     async with httpx.AsyncClient(timeout=300) as client:
         response = await client.post(
-            f"{INFERENCE_URL}/api/chat/invoke",
+            inference_server_url,
             json={
                 "raw_input": data.message,
                 "thread_id": str(chat_id),
@@ -175,8 +179,12 @@ async def send_message_stream(chat_id: UUID, data: Annotated[OneMessageRequestMo
     if current_chat is None or user.id != current_chat.user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
 
+    if data.agent_type is not None and not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the administrator can manually select the agent type")
+
     human_message = await db.exec_query(Queries.add_message_to_chat_query(chat_id, data.message, "human"))
 
+    inference_server_url = f"{INFERENCE_URL}/api/chat/invoke" + (f"/{data.agent_type}" if data.agent_type is not None else "") + "/stream"
     async def stream_generator():
         full_reply = ""
         document_comment = ""
@@ -186,7 +194,7 @@ async def send_message_stream(chat_id: UUID, data: Annotated[OneMessageRequestMo
             async with httpx.AsyncClient(timeout=120) as client:
                 async with client.stream(
                     "POST",
-                    f"{INFERENCE_URL}/api/chat/invoke/stream",
+                    inference_server_url,
                     json={
                         "raw_input": data.message,
                         "thread_id": str(chat_id),
