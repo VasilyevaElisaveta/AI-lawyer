@@ -103,13 +103,6 @@ async def send_message(chat_id: UUID, data: Annotated[OneMessageRequestModel, Fo
     if current_chat is None or user.id != current_chat.user_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found.")
     
-    if current_chat.name is None:
-        from datetime import datetime
-
-        name = f"chat {datetime.now()}"
-        appeal_type = f"appeal {datetime.now().time()}"
-        await db.exec_query(Queries.add_chat_name_and_appeal_type_query(chat_id, name, appeal_type), returning=False)
-    
     human_message = await db.exec_query(Queries.add_message_to_chat_query(chat_id, data.message, "human"))
 
     async with httpx.AsyncClient(timeout=300) as client:
