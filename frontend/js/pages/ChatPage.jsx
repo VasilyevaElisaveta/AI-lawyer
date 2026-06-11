@@ -191,12 +191,12 @@ function ChatPage({ user, sidebarOpen, setSidebar }) {
         streamingRef.current = false;
       },
 
-      onError(msg) {
-        setMessages(prev => prev.filter(m => m.id !== streamId));
-        toast.error(msg);
-        setStreaming(false);
-        streamingRef.current = false;
-      },
+        onError(msg) {
+          setMessages(prev => prev.filter(m => m.id !== streamId));
+          toast.error('Что-то пошло не так. Попробуйте переформулировать вопрос или повторить позже.');
+          setStreaming(false);
+          streamingRef.current = false;
+        },
     });
   }
 
