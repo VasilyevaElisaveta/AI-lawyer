@@ -2,8 +2,7 @@ function App() {
   const [user, setUser]         = React.useState(() => Auth.getUser());
   const [page, setPage]         = React.useState(() => {
     if (!Auth.isLoggedIn()) return 'login';
-    const u = Auth.getUser();
-    return u && u.is_admin ? 'admin' : 'chat';
+    return localStorage.getItem('last_page') || 'chat';
   });
   const [showProfile, setShowProfile] = React.useState(false);
   const [sidebarOpen, setSidebar]     = React.useState(true);
@@ -12,18 +11,23 @@ function App() {
     if (!Auth.isLoggedIn()) return;
     api.get('/user/me/')
       .then(me => { Auth.saveUser(me); setUser(me); })
-      .catch(() => { Auth.clear(); setUser(null); setPage('login'); });
+      .catch(() => { Auth.clear(); setUser(null); navigateTo('login'); });
   }, []);
+
+  function navigateTo(p) {
+    localStorage.setItem('last_page', p);
+    setPage(p);
+  }
 
   function handleLogin(me) {
     setUser(me);
-    setPage(me.is_admin ? 'admin' : 'chat');
+    navigateTo('chat');
   }
 
   function handleLogout() {
     Auth.clear();
     setUser(null);
-    setPage('login');
+    navigateTo('login');
     setShowProfile(false);
   }
 
@@ -37,31 +41,34 @@ function App() {
       <Toast/>
       <Header
         page={page}
-        setPage={setPage}
+        setPage={navigateTo}
         user={user}
         onProfileOpen={() => setShowProfile(true)}
       />
 
       {/* Страницы без авторизации */}
-      {!user && page === 'login'    && <LoginPage    setPage={setPage} onLogin={handleLogin}/>}
-      {!user && page === 'register' && <RegisterPage setPage={setPage} onLogin={handleLogin}/>}
+      {!user && page === 'login'    && <LoginPage    setPage={navigateTo} onLogin={handleLogin}/>}
+      {!user && page === 'register' && <RegisterPage setPage={navigateTo} onLogin={handleLogin}/>}
 
       {/* Страницы с авторизацией */}
-      {user && page === 'chat'      && (
+      {user && page === 'chat' && (
         <ChatPage
           user={user}
           sidebarOpen={sidebarOpen}
           setSidebar={setSidebar}
         />
       )}
+
       {user && page === 'documents' && (
         <DocumentsPage
           user={user}
           sidebarOpen={sidebarOpen}
           setSidebar={setSidebar}
+          onNavigateToChat={() => navigateTo('chat')}
         />
       )}
-      {user && page === 'admin' && <AdminPage user={user}/>}
+
+      {user && user.is_admin && page === 'admin' && <AdminPage user={user}/>}
 
       {/* Модалка профиля */}
       {showProfile && user && (

@@ -1,4 +1,4 @@
-function DocumentsPage({ user, sidebarOpen, setSidebar }) {
+function DocumentsPage({ user, sidebarOpen, setSidebar, onNavigateToChat }) {
   const [docs, setDocs]       = React.useState([]);
   const [chats, setChats]     = React.useState([]);
   const [loading, setLoading] = React.useState(true);
@@ -63,7 +63,7 @@ function DocumentsPage({ user, sidebarOpen, setSidebar }) {
           chats={chats}
           activeChatId={null}
           onNewChat={() => {}}
-          onSelectChat={() => {}}
+          onSelectChat={(chat) => onNavigateToChat(chat.id)}
         />
       )}
 

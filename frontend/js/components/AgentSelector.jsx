@@ -4,26 +4,26 @@ const AGENTS = [
   {
     id: 'auto',
     label: 'Авто',
-    description: 'Агент сам определит что вам нужно',
+    description: 'Маршрутизатор сам выберет агента',
     icon: '🤖',
   },
   {
-    id: 'claims_agent_lawsuit',
-    label: 'Иск',
-    description: 'Агент задаст вопросы и составит исковое заявление',
+    id: 'claims_agent',
+    label: 'Иски и претензии',
+    description: 'Напрямую к агенту по документам',
     icon: '⚖️',
   },
   {
-    id: 'claims_agent_complaint',
-    label: 'Претензия',
-    description: 'Агент задаст вопросы и составит досудебную претензию',
-    icon: '📝',
+    id: 'general_questions_agent',
+    label: 'Общие вопросы',
+    description: 'Напрямую к агенту консультаций',
+    icon: '💬',
   },
   {
-    id: 'general_questions_agent',
-    label: 'Вопрос',
-    description: 'Консультация по юридическому вопросу',
-    icon: '💬',
+    id: 'router_agent',
+    label: 'Маршрутизатор',
+    description: 'Только классификация без ответа',
+    icon: '🔀',
   },
 ];
 function AgentSelector({ selected, onChange }) {

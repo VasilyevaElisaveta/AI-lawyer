@@ -237,7 +237,7 @@ async def send_message_stream(chat_id: UUID, data: Annotated[OneMessageRequestMo
         if result_event["document_created"]:
             reply_text = document_comment
         else:
-            reply_text = full_reply
+            reply_text = full_reply if full_reply.strip() else result_event.get("reply", "")
 
         ai_message = await db.exec_query(
             Queries.add_message_to_chat_query(
@@ -255,7 +255,7 @@ async def send_message_stream(chat_id: UUID, data: Annotated[OneMessageRequestMo
         if result_event["document_created"]:
             document_path = result_event["reply"]
             file = await db.exec_query(
-                Queries.create_file_query(document_path.name, user.id, chat_id, str(document_path))
+                Queries.create_file_query(Path(document_path).name, user.id, chat_id, str(document_path))
             )
             await db.exec_query(Queries.add_attachment_query(ai_message["id"], file.id), returning=False)
             ai_message["files"] = await db.exec_query(Queries.get_files_query(ai_message["id"]), one_or_none=False)

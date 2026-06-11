@@ -71,15 +71,6 @@ function renderText(text) {
   });
 }
 
-const AGENT_HINTS = {
-  auto:             null,
-  general_question: 'Режим: консультация',
-  pretrial_claim:   'Режим: претензия',
-  lawsuit:          'Режим: исковое заявление',
-  contract:         'Режим: договор',
-};
-
-// Потоковый курсор
 function Cursor() {
   return <span style={{
     display: 'inline-block', width: 2, height: '1em',
@@ -89,18 +80,19 @@ function Cursor() {
 }
 
 function ChatPage({ user, sidebarOpen, setSidebar }) {
-  const [chats,       setChats]       = React.useState([]);
-  const [activeChatId, setActive]     = React.useState(null);
-  const [messages,    setMessages]    = React.useState([]);
-  const [input,       setInput]       = React.useState('');
-  const [streaming,   setStreaming]   = React.useState(false); // идёт стриминг
-  const [loadingChat, setLoadingChat] = React.useState(false);
-  const [agentType,   setAgentType]   = React.useState('auto');
+  const [chats,        setChats]       = React.useState([]);
+  const [agentType,    setAgentType]   = React.useState('auto');
+  const [activeChatId, setActive]      = React.useState(null);
+  const [messages,     setMessages]    = React.useState([]);
+  const [input,        setInput]       = React.useState('');
+  const [streaming,    setStreaming]   = React.useState(false);
+  const [loadingChat,  setLoadingChat] = React.useState(false);
 
-  const activeRef    = React.useRef(null);
-  const endRef       = React.useRef(null);
-  const textRef      = React.useRef(null);
-  const streamingRef = React.useRef(false); // синхронный флаг
+  const activeRef     = React.useRef(null);
+  const endRef        = React.useRef(null);
+  const textRef       = React.useRef(null);
+  const streamingRef  = React.useRef(false);
+  const streamTextRef = React.useRef(''); // накопленный текст стрима
 
   React.useEffect(() => { activeRef.current = activeChatId; }, [activeChatId]);
 
@@ -142,63 +134,64 @@ function ChatPage({ user, sidebarOpen, setSidebar }) {
     const text = input.trim();
     if (!text || streamingRef.current) return;
 
-    // Создать чат если нет активного
     let cid = activeRef.current;
     if (!cid) {
       try {
         const c = await api.post('/chat/create/', null);
         cid = c.id;
         setActive(cid); activeRef.current = cid;
-        setChats(prev => [c, ...prev]);
+        setChats(prev => [{ ...c, created_at: c.created_at || new Date().toISOString() }, ...prev]);
       } catch { toast.error('Не удалось создать чат'); return; }
     }
 
     setInput('');
     if (textRef.current) textRef.current.style.height = 'auto';
 
-    // Добавить сообщение пользователя
     const userMsg = { id: `h-${Date.now()}`, role: 'human', text, files: [] };
     setMessages(prev => [...prev, userMsg]);
 
-    // Добавить пустое сообщение агента — будем наполнять стримом
     const streamId = `stream-${Date.now()}`;
     setMessages(prev => [...prev, { id: streamId, role: 'ai', text: '', files: [], _streaming: true }]);
 
     setStreaming(true);
     streamingRef.current = true;
+    streamTextRef.current = ''; // сброс накопленного текста
 
-    // Формируем сообщение с префиксом агента если выбран конкретный
-    const msgText = agentType !== 'auto' ? `[agent:${agentType}] ${text}` : text;
     const fd = new FormData();
-    fd.append('message', msgText);
+    fd.append('message', text);
+    if (user.is_admin && agentType !== 'auto') {
+      fd.append('agent_type', agentType);
+    }
 
     await api.stream(`/chat/${cid}/message/stream/`, fd, {
+
       onChunk(stage, content) {
-        // Дописываем текст в потоковое сообщение
         if (stage === 'answer' || stage === 'document_comment') {
+          streamTextRef.current += content; // сохраняем в ref
           setMessages(prev => prev.map(m =>
-            m.id === streamId
-              ? { ...m, text: m.text + content }
-              : m
+            m.id === streamId ? { ...m, text: m.text + content } : m
           ));
         }
       },
+
       onDone(finalMsg) {
-        // Заменяем временное сообщение финальным (с id, files, rating из БД)
-        setMessages(prev => prev.map(m =>
-          m.id === streamId
-            ? { ...finalMsg, _streaming: false }
-            : m
-        ));
-        // Обновить название чата в сайдбаре
+        const accumulated = streamTextRef.current;
+        setMessages(prev => prev.map(m => {
+          if (m.id !== streamId) return m;
+          // Если бэкенд вернул пустой text — используем накопленный стрим
+          const displayText = (finalMsg.text && finalMsg.text.trim())
+            ? finalMsg.text
+            : accumulated;
+          return { ...finalMsg, text: displayText, _streaming: false };
+        }));
         setChats(prev => prev.map(c =>
           c.id === cid ? { ...c, name: c.name || text.slice(0, 50) } : c
         ));
         setStreaming(false);
         streamingRef.current = false;
       },
+
       onError(msg) {
-        // Убрать пустое потоковое сообщение, показать ошибку
         setMessages(prev => prev.filter(m => m.id !== streamId));
         toast.error(msg);
         setStreaming(false);
@@ -246,13 +239,11 @@ function ChatPage({ user, sidebarOpen, setSidebar }) {
       )}
 
       <main className="chat-main">
-        {/* Шапка с выбором агента */}
         <div className="chat-topbar">
           <div className="chat-topbar__left">
-            {/*<AgentSelector selected={agentType} onChange={setAgentType} disabled={streaming}/>
-            {AGENT_HINTS[agentType] && (
-              <span className="chat-agent-hint">{AGENT_HINTS[agentType]}</span>
-            )}*/}
+            {user && user.is_admin && (
+            <AgentSelector selected={agentType} onChange={setAgentType} disabled={streaming}/>
+          )}
           </div>
           {activeChatId && !streaming && (
             <button className="chat-topbar__new" onClick={handleNewChat}>+ Новый чат</button>
@@ -262,7 +253,6 @@ function ChatPage({ user, sidebarOpen, setSidebar }) {
           )}
         </div>
 
-        {/* Сообщения */}
         <div className="messages-area">
           {showWelcome && (
             <div className="welcome-msg">
@@ -282,9 +272,7 @@ function ChatPage({ user, sidebarOpen, setSidebar }) {
                 <div className="msg-col">
                   <div className={`bubble ${isUser ? 'bubble--user' : 'bubble--bot'}`}>
                     {renderText(msg.text)}
-                    {/* Мигающий курсор во время стриминга */}
                     {msg._streaming && <Cursor/>}
-                    {/* Прикреплённые файлы */}
                     {msg.files && msg.files.length > 0 && (
                       <div className="file-list">
                         {msg.files.map(f => (
@@ -296,7 +284,6 @@ function ChatPage({ user, sidebarOpen, setSidebar }) {
                       </div>
                     )}
                   </div>
-                  {/* Звёздочки только для сохранённых сообщений агента */}
                   {!isUser && activeChatId && !msg._streaming && typeof msg.id === 'number' && (
                     <Stars messageId={msg.id} currentRating={msg.rating} chatId={activeChatId}/>
                   )}
@@ -308,7 +295,6 @@ function ChatPage({ user, sidebarOpen, setSidebar }) {
           <div ref={endRef}/>
         </div>
 
-        {/* Поле ввода */}
         <div className="input-area">
           <div className="input-row">
             <textarea ref={textRef} className="chat-input"

@@ -63,6 +63,25 @@ const api = (() => {
     return fd;
   }
 
+  function processEvent(event, onChunk, onDone, onError) {
+    if (!event || typeof event !== 'object') return false;
+
+    if (event.type === 'error') {
+      onError('Агент не смог обработать запрос. Попробуйте переформулировать.');
+      return true;
+    }
+
+    if (event.type === 'progress') {
+      onChunk(event.stage, event.content || '');
+    }
+
+    if (event.message && typeof event.message === 'object') {
+      onDone(event.message);
+    }
+
+    return false;
+  }
+
   return {
     get:     (path, opts)       => request(path, { method: 'GET', ...opts }),
     post:    (path, body, opts) => request(path, { method: 'POST', body, ...opts }),
@@ -77,12 +96,6 @@ const api = (() => {
       return res;
     },
 
-    /* ── Streaming NDJSON ──
-     * Вызов: api.stream(path, formData, { onChunk, onDone, onError })
-     * onChunk(stage, content) — вызывается при каждом progress-событии
-     * onDone(message)         — вызывается с финальным объектом сообщения
-     * onError(msg)            — вызывается при ошибке
-     */
     async stream(path, formData, { onChunk, onDone, onError }) {
       let res;
       try {
@@ -106,8 +119,9 @@ const api = (() => {
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let   buffer  = '';
+      let   stopped = false;
 
-      while (true) {
+      while (!stopped) {
         let done, value;
         try {
           ({ done, value } = await reader.read());
@@ -119,25 +133,15 @@ const api = (() => {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop(); // последняя неполная строка
+        buffer = lines.pop();
 
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
           let event;
           try { event = JSON.parse(trimmed); } catch { continue; }
-
-          if (event.type === 'error') {
-            onError('Агент не смог обработать запрос. Попробуйте переформулировать.');
-            return;
-          }
-          if (event.type === 'progress') {
-            onChunk(event.stage, event.content);
-          }
-          // Финальное событие — объект с ключом "message"
-          if (event.message) {
-            onDone(event.message);
-          }
+          stopped = processEvent(event, onChunk, onDone, onError);
+          if (stopped) break;
         }
       }
 
@@ -145,8 +149,7 @@ const api = (() => {
       if (buffer.trim()) {
         try {
           const event = JSON.parse(buffer.trim());
-          if (event.message) onDone(event.message);
-          if (event.type === 'error') onError('Ошибка агента. Попробуйте ещё раз.');
+          processEvent(event, onChunk, onDone, onError);
         } catch {}
       }
     },

@@ -34,8 +34,10 @@ function Header({ page, setPage, user, onProfileOpen }) {
 
       {user && (
         <nav className="header-nav">
-              <button className={`btn-nav ${isChat ? 'btn-nav--active' : 'btn-nav--inactive'}`}
-                onClick={() => setPage('admin')}>Статистика</button>
+              {user.is_admin && (
+                <button className={`btn-nav ${isAdmin ? 'btn-nav--active' : 'btn-nav--inactive'}`}
+                  onClick={() => setPage('admin')}>Статистика</button>
+              )}
               <button className={`btn-nav ${isChat ? 'btn-nav--active' : 'btn-nav--inactive'}`}
                 onClick={() => setPage('chat')}>Агент</button>
               <button className={`btn-nav ${isDocs ? 'btn-nav--active' : 'btn-nav--inactive'}`}

@@ -7,32 +7,94 @@ function HistoryIcon() {
   );
 }
 
+function ChatItem({
+  chat, isActive, isRenaming, inputRef,
+  onSelect, onStartRename, onCommitRename, onCancelRename, onDelete,
+}) {
+  const [hovered, setHovered] = React.useState(false);
+  const label = chat.name
+    ? (chat.name.length > 28 ? chat.name.slice(0, 28) + '...' : chat.name)
+    : 'Новый чат';
+
+  if (isRenaming) {
+    return (
+      <div className={`chat-item ${isActive ? 'chat-item--active' : ''}`}
+        style={{ padding: '5px 10px' }}>
+        <input
+          ref={inputRef}
+          defaultValue={chat.name || ''}
+          onBlur={e => onCommitRename(chat, e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter')  onCommitRename(chat, e.target.value);
+            if (e.key === 'Escape') onCancelRename();
+          }}
+          style={{
+            width: '100%', border: '1.5px solid #277F4B',
+            borderRadius: 6, padding: '4px 8px',
+            fontSize: 13, fontFamily: 'inherit', outline: 'none',
+          }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`chat-item ${isActive ? 'chat-item--active' : ''}`}
+      style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+      onClick={() => onSelect(chat)}
+      onDoubleClick={e => onStartRename(chat, e)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title="Двойной клик — переименовать"
+    >
+      <span style={{ flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+        {label}
+      </span>
+      {hovered && (
+        <button
+          onClick={e => onDelete(chat, e)}
+          title="Удалить чат"
+          style={{
+            background:'none', border:'none', cursor:'pointer',
+            color:'#aaa', fontSize:16, lineHeight:1,
+            padding:'0 2px', flexShrink:0,
+            display:'flex', alignItems:'center',
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = '#dc2626'}
+          onMouseLeave={e => e.currentTarget.style.color = '#aaa'}
+        >×</button>
+      )}
+    </div>
+  );
+}
+
 function Sidebar({ chats, setChats, activeChatId, onNewChat, onSelectChat }) {
   const [renamingId, setRenamingId] = React.useState(null);
-  const [renameVal,  setRenameVal]  = React.useState('');
   const inputRef = React.useRef(null);
 
-  const now        = new Date();
-  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startWeek  = new Date(startToday); startWeek.setDate(startWeek.getDate() - 7);
+  const now            = new Date();
+  const startToday     = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startYesterday = new Date(startToday); startYesterday.setDate(startYesterday.getDate() - 1);
+  const startWeek      = new Date(startToday); startWeek.setDate(startWeek.getDate() - 7);
 
-  const groups = { today: [], week: [], older: [] };
+  const groups = { today: [], yesterday: [], week: [], older: [] };
   (chats || []).forEach(c => {
     const d = new Date(c.created_at);
-    if (d >= startToday)     groups.today.push(c);
-    else if (d >= startWeek) groups.week.push(c);
-    else                     groups.older.push(c);
+    if (d >= startToday)          groups.today.push(c);
+    else if (d >= startYesterday) groups.yesterday.push(c);
+    else if (d >= startWeek)      groups.week.push(c);
+    else                          groups.older.push(c);
   });
 
   function startRename(chat, e) {
     e.stopPropagation();
     setRenamingId(chat.id);
-    setRenameVal(chat.name || '');
     setTimeout(() => inputRef.current?.focus(), 50);
   }
 
-  async function commitRename(chat) {
-    const name = renameVal.trim();
+  async function commitRename(chat, value) {
+    const name = (value || '').trim();
     setRenamingId(null);
     if (!name || name === chat.name) return;
     try {
@@ -44,47 +106,18 @@ function Sidebar({ chats, setChats, activeChatId, onNewChat, onSelectChat }) {
     }
   }
 
-  function handleRenameKey(e, chat) {
-    if (e.key === 'Enter')  commitRename(chat);
-    if (e.key === 'Escape') setRenamingId(null);
-  }
+  function cancelRename() { setRenamingId(null); }
 
-  function ChatItem({ chat }) {
-    const isActive  = activeChatId === chat.id;
-    const isRenaming = renamingId === chat.id;
-    const label = chat.name
-      ? (chat.name.length > 30 ? chat.name.slice(0, 30) + '...' : chat.name)
-      : 'Новый чат';
-
-    if (isRenaming) {
-      return (
-        <div className={`chat-item ${isActive ? 'chat-item--active' : ''}`}
-          style={{ padding: '5px 10px' }}>
-          <input
-            ref={inputRef}
-            value={renameVal}
-            onChange={e => setRenameVal(e.target.value)}
-            onBlur={() => commitRename(chat)}
-            onKeyDown={e => handleRenameKey(e, chat)}
-            style={{
-              width: '100%', border: '1.5px solid #277F4B', borderRadius: 6,
-              padding: '4px 8px', fontSize: 13, fontFamily: 'inherit', outline: 'none',
-            }}
-          />
-        </div>
-      );
+  async function deleteChat(chat, e) {
+    e.stopPropagation();
+    if (!window.confirm(`Удалить чат «${chat.name || 'Новый чат'}»?`)) return;
+    try {
+      await api.delete(`/chat/${chat.id}/`);
+      setChats(prev => prev.filter(c => c.id !== chat.id));
+      toast.success('Чат удалён');
+    } catch {
+      toast.error('Не удалось удалить чат');
     }
-
-    return (
-      <div
-        className={`chat-item ${isActive ? 'chat-item--active' : ''}`}
-        onClick={() => onSelectChat(chat)}
-        onDoubleClick={e => startRename(chat, e)}
-        title={`${chat.name || 'Новый чат'}\nДважды кликните для переименования`}
-      >
-        {label}
-      </div>
-    );
   }
 
   function Group({ title, items }) {
@@ -92,7 +125,20 @@ function Sidebar({ chats, setChats, activeChatId, onNewChat, onSelectChat }) {
     return (
       <>
         <div className="sidebar-group-label">{title}</div>
-        {items.map(c => <ChatItem key={c.id} chat={c}/>)}
+        {items.map(c => (
+          <ChatItem
+            key={c.id}
+            chat={c}
+            isActive={activeChatId === c.id}
+            isRenaming={renamingId === c.id}
+            inputRef={inputRef}
+            onSelect={onSelectChat}
+            onStartRename={startRename}
+            onCommitRename={commitRename}
+            onCancelRename={cancelRename}
+            onDelete={deleteChat}
+          />
+        ))}
       </>
     );
   }
@@ -102,20 +148,18 @@ function Sidebar({ chats, setChats, activeChatId, onNewChat, onSelectChat }) {
       <div className="sidebar-header">
         <HistoryIcon/> История чатов
       </div>
-
       <button className="new-chat-btn" onClick={onNewChat}>+ Новый чат</button>
-
       <div className="sidebar-chats">
         <Group title="Сегодня"           items={groups.today}/>
+        <Group title="Вчера"             items={groups.yesterday}/>
         <Group title="На прошлой неделе" items={groups.week}/>
         <Group title="Раньше"            items={groups.older}/>
         {!chats.length && (
-          <div style={{ padding: '20px 16px', fontSize: 12, color: '#bbb', textAlign: 'center' }}>
+          <div style={{ padding:'20px 16px', fontSize:12, color:'#bbb', textAlign:'center' }}>
             Нет чатов
           </div>
         )}
       </div>
-
       <div className="sidebar-bottom">Поддержка</div>
     </aside>
   );
