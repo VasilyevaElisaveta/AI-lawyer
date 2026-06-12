@@ -21,6 +21,7 @@ from ...prompts import (
     COMPLAINT_GENERATOR_REWORK_HUMAN,
     render_template,
 )
+from ...utils import coerce_documents_text
 
 from ....utils import update_tokens_metadata, state_int
 
@@ -201,7 +202,7 @@ def _collect_lawsuit_variables(state: ClaimsAgentState) -> dict[str, Any]:
         "court_jurisdiction": court_jurisdiction,
         "proceeding_type": classification.get("proceeding_type", "lawsuit"),
         "facts": state.get("facts", "[НЕ УКАЗАНО]"),
-        "documents": state.get("documents", "[НЕ УКАЗАНО]"),
+        "documents": coerce_documents_text(state.get("documents")) or "[НЕ УКАЗАНО]",
         "claims": state.get("claims", "[НЕ УКАЗАНО]"),
         "principal_amount": _amount("principal_amount"),
         "penalty_amount": _amount("penalty_amount"),
@@ -268,7 +269,7 @@ def _collect_complaint_variables(state: ClaimsAgentState) -> dict[str, Any]:
         "sender_info": state.get("plaintiff_info", "[НЕ УКАЗАНО]"),
         "recipient_info": state.get("defendant_info", "[НЕ УКАЗАНО]"),
         "facts": state.get("facts", "[НЕ УКАЗАНО]"),
-        "documents": state.get("documents", "[НЕ УКАЗАНО]"),
+        "documents": coerce_documents_text(state.get("documents")) or "[НЕ УКАЗАНО]",
         "claims": state.get("claims", "[НЕ УКАЗАНО]"),
         "complaint_type": complaint_type,
         "complaint_sphere": complaint_sphere,
@@ -352,7 +353,7 @@ def _generate_complaint_attachments_list(state: ClaimsAgentState) -> str:
     counter = 1
 
     # 1. Документы-основания из поля documents
-    user_docs = state.get("documents", "")
+    user_docs = coerce_documents_text(state.get("documents"))
     if user_docs and user_docs not in ("[НЕ УКАЗАНО]", ""):
         doc_list = _parse_document_list(user_docs)
         for doc_name in doc_list:
@@ -377,9 +378,12 @@ def _generate_complaint_attachments_list(state: ClaimsAgentState) -> str:
     return "\n".join(attachments)
 
 
-def _parse_document_list(text: str) -> list[str]:
+def _parse_document_list(text: Any) -> list[str]:
     import re
-    cleaned = re.sub(r"^\s*[\d\-•.]+\s*", "", text, flags=re.MULTILINE)
+    normalized = coerce_documents_text(text).strip()
+    if not normalized or normalized == "[НЕ УКАЗАНО]":
+        return []
+    cleaned = re.sub(r"^\s*[\d\-•.]+\s*", "", normalized, flags=re.MULTILINE)
     items = re.split(r"[;\n]", cleaned)
     return [item.strip() for item in items if item.strip()]
 
@@ -495,7 +499,7 @@ def _generate_attachments_list(state: ClaimsAgentState) -> str:
         attachments.append(f"{counter}. Расчёт исковых требований — 1 экз.")
         counter += 1
 
-    user_docs = state.get("documents", "")
+    user_docs = coerce_documents_text(state.get("documents"))
     if user_docs and user_docs not in ("[НЕ УКАЗАНО]", ""):
         for doc_name in _parse_document_list(user_docs):
             if any(kw in doc_name.lower() for kw in

@@ -15,6 +15,7 @@ from .text_parse import parse_labeled_user_text
 
 from ...state import ClaimsAgentState
 from ...prompts import INTAKE_HUMAN, INTAKE_SYSTEM, render_template
+from ...utils import coerce_documents_text
 
 from ....utils import extract_llm_json, update_tokens_metadata
 
@@ -93,6 +94,8 @@ def _map_structured(data: dict, *, skip_document_type: bool = False) -> dict[str
         if src not in data:
             continue
         value = data[src]
+        if dst == "documents":
+            value = coerce_documents_text(value)
         if _is_empty_value(value):
             continue
         updates[dst] = value

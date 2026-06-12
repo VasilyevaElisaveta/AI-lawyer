@@ -11,14 +11,17 @@ from agents.llm_client import DEFAULT_GIGACHAT_PARAMS, create_gigachat
 
 def build_llm(max_tokens: int = 1024, temperature: float = 0.0):
     """GigaChat с фиксированной температурой для воспроизводимости."""
+    gigachat_params = {
+        **DEFAULT_GIGACHAT_PARAMS,
+        "max_tokens": max_tokens,
+        "streaming": False,
+    }
     return create_gigachat(
         os.getenv("LLM_MODEL", "GigaChat"),
         credentials=os.getenv("SBER_AUTH", ""),
         scope=os.getenv("GIGACHAT_SCOPE", "GIGACHAT_API_PERS"),
         temperature=temperature,
-        **DEFAULT_GIGACHAT_PARAMS,
-        max_tokens=max_tokens,
-        streaming=False,
+        **gigachat_params,
     )
 
 
