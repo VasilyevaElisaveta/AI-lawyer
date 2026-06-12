@@ -73,10 +73,16 @@ app = FastAPI(
 )
 
 origins = [
+    "http://localhost",
     "http://localhost:8000",
     "http://127.0.0.1:5500",
     "http://localhost:5500",
 ]
+
+deploy_server_ip = getenv("deploy_server_ip")
+if deploy_server_ip is not None:
+    origins += [f"http://{deploy_server_ip}", f"https://{deploy_server_ip}"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,

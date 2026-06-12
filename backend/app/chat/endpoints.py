@@ -158,7 +158,6 @@ async def send_message(chat_id: UUID, data: Annotated[OneMessageRequestModel, Fo
 
     if model_response["document_created"]:
         document_path = model_response["reply"]
-        print(document_path)
         file = await db.exec_query(
             Queries.create_file_query(Path(document_path).name, user.id, chat_id, document_path)
         )

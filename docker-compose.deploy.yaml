@@ -30,7 +30,7 @@ services:
       - network
 
   backend:
-    build: ./backend/
+    image: busyaska/ai-lawyer-backend:1.0.0
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -62,16 +62,11 @@ services:
       - network
 
   inference-server:
-    build:
-      context: ./src
-      dockerfile: ./Dockerfile
-      additional_contexts:
-        logger_lib: ./libs/logger
+    image: busyaska/ai-lawyer-inference:1.0.0
     container_name: ai-lawyer-inference-server
     restart: always
     env_file:
       - .env
-      - ./src/.env
     ports:
       - 8000:8000
     depends_on:
@@ -90,7 +85,7 @@ services:
       - network
 
   frontend:
-    build: ./frontend/
+    image: busyaska/ai-lawyer-frontend:1.0.0
     restart: no
     volumes:
       - frontend_static:/static
@@ -98,7 +93,7 @@ services:
       - network
 
   gateaway:
-    build: ./nginx/
+    image: busyaska/ai-lawyer-nginx:1.0.0
     restart: always
     ports:
       - 80:80
