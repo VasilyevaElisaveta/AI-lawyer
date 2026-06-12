@@ -1,4 +1,4 @@
-from sqlalchemy import select, func
+from sqlalchemy import select, func, distinct
 from sqlalchemy.orm import aliased
 
 from admin.RequestModels import UserFiltersModel, MessageFiltersModel, UserOrderBy, MessageOrderBy, Order
@@ -98,7 +98,7 @@ class Queries:
     @staticmethod
     def get_users_query(filters: UserFiltersModel):
 
-        chats = func.count(Chat.id).label("chats")
+        chats = func.count(distinct(Chat.id)).label("chats")
         tokens = func.sum(func.coalesce(Message.used_tokens, 0)).label("tokens")
 
         query = (
